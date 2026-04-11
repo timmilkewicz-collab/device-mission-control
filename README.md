@@ -4,7 +4,7 @@ Observer-first mission control for a Windows workstation, a Linux/home-server ag
 
 ## What is implemented
 
-- `hub`: HTTP dashboard and API for devices, observations, plan snapshots, and approval-gated tasks
+- `hub`: HTTP dashboard and API for devices, observations, plan snapshots, task requests, and approvals
 - `windows agent`: reports active window, screenshot attempts, services, and processes
 - `linux agent`: reports active window/workspace when available, screenshot attempts, services, processes, and containers
 - `shared protocol`: validated schemas for registrations, observations, task requests, approvals, and desktop-control readiness
@@ -57,6 +57,16 @@ Optional environment variables:
 - `POST /api/task-requests`: request a named task
 - `POST /api/task-requests/:id/decision`: approve or reject a task
 - `POST /api/task-requests/:id/result`: update task execution status/result
+
+## Dashboard workflow
+
+When `MISSION_CONTROL_TOKEN` is not set, the dashboard can drive the observer-first loop directly:
+
+- request named tasks from each registered device
+- approve or reject pending task requests from the approval queue
+- review recent task outcomes alongside device summaries
+
+If `MISSION_CONTROL_TOKEN` is set, browser forms stay disabled by policy and task mutations should go through the JSON API with a bearer token.
 
 ## Approval-gated task model
 

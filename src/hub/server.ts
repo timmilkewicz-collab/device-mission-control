@@ -1,6 +1,6 @@
 import http from "node:http";
 import { URL } from "node:url";
-import { badRequest, notFound, readJsonBody, sendHtml, sendJson, unauthorized } from "../shared/http";
+import { badRequest, notFound, readFormBody, readJsonBody, redirect, sendHtml, sendJson, unauthorized } from "../shared/http";
 import {
   deviceRegistrationSchema,
   observationSchema,
@@ -32,7 +32,12 @@ export function createHubServer(options: HubServerOptions) {
 
     try {
       if (method === "GET" && url.pathname === "/") {
-        return sendHtml(response, renderDashboard(options.store.getState(), options.store.getLatestPlan()));
+        return sendHtml(
+          response,
+          renderDashboard(options.store.getState(), options.store.getLatestPlan(), {
+            interactive: !options.sharedToken
+          })
+        );
       }
 
       if (method === "GET" && url.pathname === "/api/state") {
@@ -60,6 +65,33 @@ export function createHubServer(options: HubServerOptions) {
           throw new Error("deviceId query parameter is required.");
         }
         return sendJson(response, 200, options.store.getApprovedTasks(deviceId));
+      }
+
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/task-requests") {
+        const form = await readFormBody(request);
+        const input = taskRequestInputSchema.parse({
+          deviceId: form.deviceId,
+          taskId: form.taskId,
+          requestedBy: form.requestedBy || "dashboard"
+        });
+        options.store.requestTask(input);
+        return redirect(response, "/");
+      }
+
+      if (!options.sharedToken && method === "POST" && /^\/actions\/task-requests\/[^/]+\/decision$/.test(url.pathname)) {
+        const taskRequestId = url.pathname.split("/")[3];
+        if (!taskRequestId) {
+          throw new Error("Task request id is required.");
+        }
+
+        const form = await readFormBody(request);
+        const input = taskDecisionSchema.parse({
+          approved: form.approved === "true",
+          actor: form.actor || "dashboard",
+          reason: form.approved === "true" ? undefined : "Rejected from dashboard"
+        });
+        options.store.decideTask(taskRequestId, input);
+        return redirect(response, "/");
       }
 
       if (!assertAuthorized(options.sharedToken, request.headers.authorization)) {

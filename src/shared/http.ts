@@ -1,14 +1,30 @@
 import { IncomingMessage, ServerResponse } from "node:http";
 
-export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+async function readBody(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
 
   for await (const chunk of request) {
     chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
   }
 
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  return Buffer.concat(chunks).toString("utf8").trim();
+}
+
+export async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+  const raw = await readBody(request);
   return raw.length === 0 ? {} : JSON.parse(raw);
+}
+
+export async function readFormBody(request: IncomingMessage): Promise<Record<string, string>> {
+  const raw = await readBody(request);
+  const params = new URLSearchParams(raw);
+  const entries: Record<string, string> = {};
+
+  for (const [key, value] of params.entries()) {
+    entries[key] = value;
+  }
+
+  return entries;
 }
 
 export function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {
@@ -27,6 +43,12 @@ export function sendText(response: ServerResponse, statusCode: number, message: 
   response.statusCode = statusCode;
   response.setHeader("content-type", "text/plain; charset=utf-8");
   response.end(message);
+}
+
+export function redirect(response: ServerResponse, location: string): void {
+  response.statusCode = 303;
+  response.setHeader("location", location);
+  response.end();
 }
 
 export function notFound(response: ServerResponse): void {
