@@ -1,4 +1,4 @@
-import { HubState, PlanSnapshot, TaskRequest } from "../shared/types";
+import { CouncilSession, HubState, PlanSnapshot, TaskRequest } from "../shared/types";
 
 type DashboardOptions = {
   interactive: boolean;
@@ -24,6 +24,7 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
   const devices = Object.values(state.devices);
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   const recentTasks = [...state.taskRequests].slice(-8).reverse();
+  const councilSessions = [...state.councilSessions].slice(-6).reverse();
 
   return `<!doctype html>
 <html lang="en">
@@ -49,6 +50,8 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
       button.reject { background: #f97316; color: #431407; }
       .muted { color: #94a3b8; }
       .task-meta { margin: 8px 0; color: #cbd5e1; }
+      input, textarea { width: 100%; box-sizing: border-box; margin-top: 4px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #475569; background: #020617; color: #e2e8f0; padding: 8px 10px; }
+      .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     </style>
   </head>
   <body>
@@ -136,6 +139,31 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
     </section>
 
     <section>
+      <h2>Council Bridge</h2>
+      ${
+        options.interactive
+          ? `<form method="post" action="/actions/council/sessions">
+              <div class="task-meta">Open a coordination thread for multiple machines, apps, or agents.</div>
+              <div class="form-grid">
+                <label>Topic<br /><input name="topic" required /></label>
+                <label>Requested by<br /><input name="requestedBy" value="dashboard" /></label>
+              </div>
+              <label>Target members (comma-separated ids)<br /><input name="targetMemberIds" placeholder="windows-main, linux-home-server, cursor-agent" /></label>
+              <label>Prompt<br /><textarea name="prompt" rows="4" required placeholder="Ask the council what should happen next."></textarea></label>
+              <div class="button-row">
+                <button type="submit">Open Council Session</button>
+              </div>
+            </form>`
+          : "<p class=\"muted\">Council sessions can still be created and answered through the JSON API when token protection is enabled.</p>"
+      }
+      ${
+        councilSessions.length === 0
+          ? "<p class=\"muted\">No council sessions yet.</p>"
+          : councilSessions.map((session) => renderCouncilSession(session, options.interactive)).join("")
+      }
+    </section>
+
+    <section>
       <h2>Desktop Control Readiness</h2>
       <p><strong>${escapeHtml(state.desktopControlEvaluation?.recommendation ?? "not_ready")}</strong></p>
       <ul>${renderList(state.desktopControlEvaluation?.reasons ?? [])}</ul>
@@ -194,4 +222,33 @@ function renderRecentTask(task: TaskRequest): string {
   return `<li><code>${escapeHtml(task.deviceId)}</code> <strong>${escapeHtml(task.taskId)}</strong> is ${escapeHtml(
     task.status
   )}${detail}</li>`;
+}
+
+function renderCouncilSession(session: CouncilSession, interactive: boolean): string {
+  const targetMembers = session.targetMemberIds.length > 0 ? session.targetMemberIds.join(", ") : "open council";
+  const responses =
+    session.responses.length === 0
+      ? "<li>No responses yet.</li>"
+      : session.responses
+          .map(
+            (response) =>
+              `<li><strong>${escapeHtml(response.memberLabel)}</strong> (${escapeHtml(response.stance)}): ${escapeHtml(response.summary)}</li>`
+          )
+          .join("");
+
+  return `<div class="task-card">
+    <div><strong>${escapeHtml(session.topic)}</strong> <span class="muted">(${escapeHtml(session.status)})</span></div>
+    <div class="task-meta">Requested by ${escapeHtml(session.requestedBy)} for ${escapeHtml(targetMembers)}</div>
+    <div class="task-meta">${escapeHtml(session.prompt)}</div>
+    <ul>${responses}</ul>
+    ${
+      interactive && session.status === "open"
+        ? `<form method="post" action="/actions/council/sessions/${encodeURIComponent(session.id)}/close">
+            <div class="button-row">
+              <button type="submit" class="secondary">Close Session</button>
+            </div>
+          </form>`
+        : ""
+    }
+  </div>`;
 }

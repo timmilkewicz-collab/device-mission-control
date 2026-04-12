@@ -4,7 +4,7 @@ Observer-first mission control for a Windows workstation, a Linux/home-server ag
 
 ## What is implemented
 
-- `hub`: HTTP dashboard and API for devices, observations, plan snapshots, task requests, and approvals
+- `hub`: HTTP dashboard and API for devices, observations, plan snapshots, task requests, approvals, and council sessions
 - `windows agent`: reports active window, screenshot attempts, services, and processes
 - `linux agent`: reports active window/workspace when available, screenshot attempts, services, processes, and containers
 - `shared protocol`: validated schemas for registrations, observations, task requests, approvals, and desktop-control readiness
@@ -51,12 +51,16 @@ Optional environment variables:
 - `GET /`: HTML dashboard
 - `GET /api/state`: raw state plus latest plan snapshot
 - `GET /api/approvals`: pending task approvals
+- `GET /api/council/sessions`: current and recent council sessions
 - `GET /api/desktop-control/evaluation`: readiness gate output
 - `POST /api/devices/register`: register or refresh a device
 - `POST /api/observations`: submit an observation
 - `POST /api/task-requests`: request a named task
 - `POST /api/task-requests/:id/decision`: approve or reject a task
 - `POST /api/task-requests/:id/result`: update task execution status/result
+- `POST /api/council/sessions`: open a council session
+- `POST /api/council/sessions/:id/responses`: submit an agent or tool response
+- `POST /api/council/sessions/:id/close`: close a council session
 
 ## Dashboard workflow
 
@@ -65,8 +69,19 @@ When `MISSION_CONTROL_TOKEN` is not set, the dashboard can drive the observer-fi
 - request named tasks from each registered device
 - approve or reject pending task requests from the approval queue
 - review recent task outcomes alongside device summaries
+- open council sessions to gather input from multiple machines or external agents
 
 If `MISSION_CONTROL_TOKEN` is set, browser forms stay disabled by policy and task mutations should go through the JSON API with a bearer token.
+
+## Council bridge
+
+The hub can now act as a lightweight bridge for a small council of agents:
+
+- open a session with a topic, prompt, and optional target member ids
+- let outside tools or machines post structured responses over the JSON API
+- keep the council thread visible in the same place as device status and task approvals
+
+This is intentionally simple: it gives you one coordination surface for Tailscale-connected machines, Cursor, and other agents without pretending they all run inside the same runtime.
 
 ## Approval-gated task model
 

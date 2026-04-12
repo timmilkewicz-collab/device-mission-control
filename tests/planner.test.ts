@@ -42,6 +42,7 @@ function buildState(): HubState {
       }
     ],
     taskRequests: [],
+    councilSessions: [],
     planSnapshots: []
   };
 }

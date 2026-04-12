@@ -2,6 +2,8 @@ import http from "node:http";
 import { URL } from "node:url";
 import { badRequest, notFound, readFormBody, readJsonBody, redirect, sendHtml, sendJson, unauthorized } from "../shared/http";
 import {
+  councilResponseInputSchema,
+  councilSessionInputSchema,
   deviceRegistrationSchema,
   observationSchema,
   taskDecisionSchema,
@@ -59,6 +61,10 @@ export function createHubServer(options: HubServerOptions) {
         return sendJson(response, 200, options.store.getState().desktopControlEvaluation);
       }
 
+      if (method === "GET" && url.pathname === "/api/council/sessions") {
+        return sendJson(response, 200, options.store.getCouncilSessions());
+      }
+
       if (method === "GET" && url.pathname === "/api/task-requests") {
         const deviceId = url.searchParams.get("deviceId");
         if (!deviceId) {
@@ -94,6 +100,31 @@ export function createHubServer(options: HubServerOptions) {
         return redirect(response, "/");
       }
 
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/council/sessions") {
+        const form = await readFormBody(request);
+        const targetMemberIds = (form.targetMemberIds ?? "")
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean);
+        const input = councilSessionInputSchema.parse({
+          topic: form.topic,
+          prompt: form.prompt,
+          requestedBy: form.requestedBy || "dashboard",
+          targetMemberIds
+        });
+        options.store.createCouncilSession(input);
+        return redirect(response, "/");
+      }
+
+      if (!options.sharedToken && method === "POST" && /^\/actions\/council\/sessions\/[^/]+\/close$/.test(url.pathname)) {
+        const councilSessionId = url.pathname.split("/")[4];
+        if (!councilSessionId) {
+          throw new Error("Council session id is required.");
+        }
+        options.store.closeCouncilSession(councilSessionId);
+        return redirect(response, "/");
+      }
+
       if (!assertAuthorized(options.sharedToken, request.headers.authorization)) {
         return unauthorized(response);
       }
@@ -111,6 +142,28 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "POST" && url.pathname === "/api/task-requests") {
         const input = taskRequestInputSchema.parse(await readJsonBody(request));
         return sendJson(response, 201, options.store.requestTask(input));
+      }
+
+      if (method === "POST" && url.pathname === "/api/council/sessions") {
+        const input = councilSessionInputSchema.parse(await readJsonBody(request));
+        return sendJson(response, 201, options.store.createCouncilSession(input));
+      }
+
+      if (method === "POST" && /^\/api\/council\/sessions\/[^/]+\/responses$/.test(url.pathname)) {
+        const councilSessionId = url.pathname.split("/")[4];
+        if (!councilSessionId) {
+          throw new Error("Council session id is required.");
+        }
+        const input = councilResponseInputSchema.parse(await readJsonBody(request));
+        return sendJson(response, 201, options.store.addCouncilResponse(councilSessionId, input));
+      }
+
+      if (method === "POST" && /^\/api\/council\/sessions\/[^/]+\/close$/.test(url.pathname)) {
+        const councilSessionId = url.pathname.split("/")[4];
+        if (!councilSessionId) {
+          throw new Error("Council session id is required.");
+        }
+        return sendJson(response, 200, options.store.closeCouncilSession(councilSessionId));
       }
 
       if (method === "POST" && /^\/api\/task-requests\/[^/]+\/decision$/.test(url.pathname)) {

@@ -1,6 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
+  CouncilResponseInput,
+  CouncilSession,
+  CouncilSessionInput,
   DeviceRegistration,
   HubState,
   Observation,
@@ -55,6 +58,67 @@ export class MissionControlStore {
     this.refreshDerivedState();
     this.save();
     return observation;
+  }
+
+  createCouncilSession(input: CouncilSessionInput): CouncilSession {
+    const timestamp = nowIso();
+    const session: CouncilSession = {
+      id: generateId("council"),
+      topic: input.topic,
+      prompt: input.prompt,
+      requestedBy: input.requestedBy,
+      targetMemberIds: input.targetMemberIds,
+      status: "open",
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      responses: []
+    };
+
+    this.state.councilSessions.push(session);
+    this.refreshDerivedState();
+    this.save();
+    return session;
+  }
+
+  addCouncilResponse(councilSessionId: string, input: CouncilResponseInput) {
+    const session = this.state.councilSessions.find((entry) => entry.id === councilSessionId);
+    if (!session) {
+      throw new Error(`Unknown council session: ${councilSessionId}`);
+    }
+    if (session.status !== "open") {
+      throw new Error(`Council session ${councilSessionId} is closed.`);
+    }
+
+    session.responses.push({
+      id: generateId("vote"),
+      memberId: input.memberId,
+      memberLabel: input.memberLabel,
+      stance: input.stance,
+      summary: input.summary,
+      detail: input.detail,
+      submittedAt: nowIso()
+    });
+    session.updatedAt = nowIso();
+
+    this.refreshDerivedState();
+    this.save();
+    return session;
+  }
+
+  closeCouncilSession(councilSessionId: string): CouncilSession {
+    const session = this.state.councilSessions.find((entry) => entry.id === councilSessionId);
+    if (!session) {
+      throw new Error(`Unknown council session: ${councilSessionId}`);
+    }
+
+    const timestamp = nowIso();
+    session.status = "closed";
+    session.closedAt = timestamp;
+    session.updatedAt = timestamp;
+
+    this.refreshDerivedState();
+    this.save();
+    return session;
   }
 
   requestTask(input: TaskRequestInput): TaskRequest {
@@ -134,6 +198,10 @@ export class MissionControlStore {
 
   getPendingApprovals(): TaskRequest[] {
     return this.state.taskRequests.filter((task) => task.status === "pending");
+  }
+
+  getCouncilSessions(): CouncilSession[] {
+    return [...this.state.councilSessions].reverse();
   }
 
   getLatestPlan(): PlanSnapshot {

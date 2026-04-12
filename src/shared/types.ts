@@ -142,15 +142,6 @@ export const desktopControlEvaluationSchema = z.object({
 });
 export type DesktopControlEvaluation = z.infer<typeof desktopControlEvaluationSchema>;
 
-export const hubStateSchema = z.object({
-  devices: z.record(z.string(), deviceRecordSchema).default({}),
-  observations: z.array(observationSchema).default([]),
-  taskRequests: z.array(taskRequestSchema).default([]),
-  planSnapshots: z.array(planSnapshotSchema).default([]),
-  desktopControlEvaluation: desktopControlEvaluationSchema.optional()
-});
-export type HubState = z.infer<typeof hubStateSchema>;
-
 export const taskRequestInputSchema = z.object({
   deviceId: z.string().min(1),
   taskId: z.string().min(1),
@@ -166,12 +157,67 @@ export const taskDecisionSchema = z.object({
 });
 export type TaskDecisionInput = z.infer<typeof taskDecisionSchema>;
 
+export const councilSessionInputSchema = z.object({
+  topic: z.string().min(1),
+  prompt: z.string().min(1),
+  requestedBy: z.string().min(1).default("operator"),
+  targetMemberIds: z.array(z.string()).default([])
+});
+export type CouncilSessionInput = z.infer<typeof councilSessionInputSchema>;
+
+export const councilResponseInputSchema = z.object({
+  memberId: z.string().min(1),
+  memberLabel: z.string().min(1),
+  stance: z.enum(["support", "concern", "block", "inform"]),
+  summary: z.string().min(1),
+  detail: z.string().optional()
+});
+export type CouncilResponseInput = z.infer<typeof councilResponseInputSchema>;
+
 export const taskResultInputSchema = z.object({
   status: z.enum(["executing", "completed", "failed"]),
   resultSummary: z.string().optional(),
   resultDetail: z.string().optional()
 });
 export type TaskResultInput = z.infer<typeof taskResultInputSchema>;
+
+export const councilSessionStatusSchema = z.enum(["open", "closed"]);
+export type CouncilSessionStatus = z.infer<typeof councilSessionStatusSchema>;
+
+export const councilResponseSchema = z.object({
+  id: z.string().min(1),
+  memberId: z.string().min(1),
+  memberLabel: z.string().min(1),
+  stance: z.enum(["support", "concern", "block", "inform"]),
+  summary: z.string().min(1),
+  detail: z.string().optional(),
+  submittedAt: z.string().min(1)
+});
+export type CouncilResponse = z.infer<typeof councilResponseSchema>;
+
+export const councilSessionSchema = z.object({
+  id: z.string().min(1),
+  topic: z.string().min(1),
+  prompt: z.string().min(1),
+  requestedBy: z.string().min(1),
+  targetMemberIds: z.array(z.string()).default([]),
+  status: councilSessionStatusSchema,
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  closedAt: z.string().optional(),
+  responses: z.array(councilResponseSchema).default([])
+});
+export type CouncilSession = z.infer<typeof councilSessionSchema>;
+
+export const hubStateSchema = z.object({
+  devices: z.record(z.string(), deviceRecordSchema).default({}),
+  observations: z.array(observationSchema).default([]),
+  taskRequests: z.array(taskRequestSchema).default([]),
+  councilSessions: z.array(councilSessionSchema).default([]),
+  planSnapshots: z.array(planSnapshotSchema).default([]),
+  desktopControlEvaluation: desktopControlEvaluationSchema.optional()
+});
+export type HubState = z.infer<typeof hubStateSchema>;
 
 export function nowIso(): string {
   return new Date().toISOString();
