@@ -54,6 +54,12 @@ Or, for a one-off verification when the server is still password-authenticated:
 MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> MISSION_CONTROL_PROLIANT_SSH_PASSWORD=<password> npm run verify:proliant-ssh
 ```
 
+Pull a real observation from the ProLiant over SSH and store it in the hub:
+
+```bash
+MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> MISSION_CONTROL_PROLIANT_SSH_PASSWORD=<password> npm run collect:proliant
+```
+
 Start the Windows agent:
 
 ```bash
@@ -80,6 +86,8 @@ Optional environment variables:
 - `MISSION_CONTROL_PROLIANT_SSH_USER`: Linux username to verify the ProLiant SSH path
 - `MISSION_CONTROL_PROLIANT_SSH_KEY_PATH`: optional SSH private key path used by `npm run verify:proliant-ssh`
 - `MISSION_CONTROL_PROLIANT_SSH_PASSWORD`: optional one-off password-backed verification path for `npm run verify:proliant-ssh`
+- `MISSION_CONTROL_PROLIANT_DEVICE_ID`: optional device id for remote ProLiant observations, default `proliant-ubuntu`
+- `MISSION_CONTROL_PROLIANT_DISPLAY_NAME`: optional display name for remote ProLiant observations
 
 ## Main endpoints
 
@@ -131,8 +139,9 @@ For Tailscale-connected machines, a practical local workflow is:
 2. `npm run sync:tailscale`
 3. `npm run verify:tailscale`
 4. `MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> npm run verify:proliant-ssh`
-5. start the hub
-6. let outside agents discover it via `/.well-known/mission-control.json`
+5. `MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> MISSION_CONTROL_PROLIANT_SSH_PASSWORD=<password> npm run collect:proliant`
+6. start the hub
+7. let outside agents discover it via `/.well-known/mission-control.json`
 
 ## Dashboard workflow
 
@@ -170,6 +179,8 @@ This is the first practical step toward real cross-system execution because it g
 For live Tailscale members, `npm run verify:tailscale` can now promote a path from `reachable` to `verified` when a one-shot Tailscale ping succeeds.
 
 For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability. It can use either a key-based path or a one-off password-backed check when that is the only working login method.
+
+`npm run collect:proliant` is the first real cross-node run in the repo: it logs into the verified ProLiant SSH path, registers the server as a Linux device if needed, and stores a live observation with services, top processes, containers, and uptime in the hub state.
 
 ## Council bridge
 
