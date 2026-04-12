@@ -29,6 +29,67 @@ function assertAuthorized(token: string | undefined, authHeader: string | undefi
   return authHeader === `Bearer ${token}`;
 }
 
+function buildDiscoveryManifest(options: HubServerOptions, requestUrl: URL) {
+  const origin = requestUrl.origin;
+  return {
+    name: "device-mission-control",
+    description: "Observer-first coordination hub for machines, links, devices, agents, and council sessions.",
+    auth: options.sharedToken
+      ? {
+          mode: "bearer",
+          note: "Write operations require Authorization: Bearer <MISSION_CONTROL_TOKEN>."
+        }
+      : {
+          mode: "open-local",
+          note: "Browser actions and JSON writes are enabled because MISSION_CONTROL_TOKEN is not configured."
+        },
+    discovery: {
+      self: `${origin}/.well-known/mission-control.json`,
+      dashboard: `${origin}/`,
+      state: `${origin}/api/state`
+    },
+    endpoints: {
+      nodes: {
+        list: `${origin}/api/nodes`,
+        upsert: `${origin}/api/nodes`
+      },
+      links: {
+        list: `${origin}/api/links`,
+        upsert: `${origin}/api/links`
+      },
+      devices: {
+        list: `${origin}/api/devices`,
+        register: `${origin}/api/devices/register`
+      },
+      observations: {
+        submit: `${origin}/api/observations`
+      },
+      tasks: {
+        approvedForDevice: `${origin}/api/task-requests?deviceId=<deviceId>`,
+        request: `${origin}/api/task-requests`,
+        decide: `${origin}/api/task-requests/<taskRequestId>/decision`,
+        result: `${origin}/api/task-requests/<taskRequestId>/result`,
+        approvals: `${origin}/api/approvals`
+      },
+      council: {
+        list: `${origin}/api/council/sessions`,
+        create: `${origin}/api/council/sessions`,
+        respond: `${origin}/api/council/sessions/<sessionId>/responses`,
+        close: `${origin}/api/council/sessions/<sessionId>/close`
+      },
+      evaluation: {
+        desktopControl: `${origin}/api/desktop-control/evaluation`
+      }
+    },
+    suggestedBootOrder: [
+      "GET /.well-known/mission-control.json",
+      "GET /api/state",
+      "GET /api/nodes",
+      "GET /api/links"
+    ]
+  };
+}
+
 export function createHubServer(options: HubServerOptions) {
   const server = http.createServer(async (request, response) => {
     const method = request.method ?? "GET";
@@ -42,6 +103,10 @@ export function createHubServer(options: HubServerOptions) {
             interactive: !options.sharedToken
           })
         );
+      }
+
+      if (method === "GET" && url.pathname === "/.well-known/mission-control.json") {
+        return sendJson(response, 200, buildDiscoveryManifest(options, url));
       }
 
       if (method === "GET" && url.pathname === "/api/state") {

@@ -55,6 +55,7 @@ Optional environment variables:
 ## Main endpoints
 
 - `GET /`: HTML dashboard
+- `GET /.well-known/mission-control.json`: discovery manifest for agents and other machines
 - `GET /api/nodes`: registered network nodes and partial integrations
 - `GET /api/links`: registered connection paths between nodes
 - `GET /api/state`: raw state plus latest plan snapshot
@@ -71,6 +72,29 @@ Optional environment variables:
 - `POST /api/council/sessions`: open a council session
 - `POST /api/council/sessions/:id/responses`: submit an agent or tool response
 - `POST /api/council/sessions/:id/close`: close a council session
+
+## Agent discovery
+
+Agents and external tools should start with:
+
+```bash
+GET /.well-known/mission-control.json
+```
+
+That manifest tells other machines and LLM agents:
+
+- where the hub is
+- which endpoints exist
+- whether writes are open locally or require a bearer token
+- what order to query the hub in for a clean startup
+
+Recommended startup flow for outside agents:
+
+1. fetch the discovery manifest
+2. fetch `/api/state`
+3. fetch `/api/nodes`
+4. fetch `/api/links`
+5. then decide whether to register, observe, respond to council, or request/execute tasks
 
 ## Dashboard workflow
 
