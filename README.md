@@ -36,6 +36,12 @@ Refresh node and link status from the live tailnet:
 npm run sync:tailscale
 ```
 
+Verify live Tailscale links and promote proven paths to `verified`:
+
+```bash
+npm run verify:tailscale
+```
+
 Start the Windows agent:
 
 ```bash
@@ -106,8 +112,9 @@ For Tailscale-connected machines, a practical local workflow is:
 
 1. `npm run seed:known-network`
 2. `npm run sync:tailscale`
-3. start the hub
-4. let outside agents discover it via `/.well-known/mission-control.json`
+3. `npm run verify:tailscale`
+4. start the hub
+5. let outside agents discover it via `/.well-known/mission-control.json`
 
 ## Dashboard workflow
 
@@ -141,6 +148,8 @@ The hub now tracks connection paths separately from nodes:
 - keep setup notes visible while a path is still being proven out
 
 This is the first practical step toward real cross-system execution because it gives connection work its own place in the model.
+
+For live Tailscale members, `npm run verify:tailscale` can now promote a path from `reachable` to `verified` when a one-shot Tailscale ping succeeds.
 
 ## Council bridge
 

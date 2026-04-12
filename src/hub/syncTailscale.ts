@@ -1,34 +1,9 @@
-import { execFileSync } from "node:child_process";
 import { resolveDataPath } from "../shared/paths";
 import { MissionControlStore } from "./store";
-
-type TailscalePeer = {
-  HostName: string;
-  DNSName: string;
-  OS: string;
-  Online: boolean;
-  TailscaleIPs?: string[];
-};
-
-type TailscaleStatus = {
-  Self: TailscalePeer;
-  Peer?: Record<string, TailscalePeer>;
-};
+import { getTailscaleStatus, inferKind, normalizeNodeId, TailscalePeer } from "./tailscale";
 
 const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const checkedAt = new Date().toISOString();
-const knownHostAliases: Record<string, string> = {
-  "timothy-s-s25-ultra": "timothys-s25-ultra"
-};
-
-function normalizeNodeId(hostName: string): string {
-  const normalized = hostName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return knownHostAliases[normalized] ?? normalized;
-}
-
-function inferKind(os: string): "machine" | "mobile" {
-  return os === "android" ? "mobile" : "machine";
-}
 
 function pruneAlias(aliasNodeId: string, canonicalNodeId: string): void {
   if (aliasNodeId === canonicalNodeId) {
@@ -105,8 +80,7 @@ function syncPeer(peer: TailscalePeer, isSelf = false): void {
   }
 }
 
-const raw = execFileSync("tailscale", ["status", "--json"], { encoding: "utf8" });
-const status = JSON.parse(raw) as TailscaleStatus;
+const status = getTailscaleStatus();
 
 syncPeer(status.Self, true);
 

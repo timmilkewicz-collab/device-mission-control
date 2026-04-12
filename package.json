@@ -9,6 +9,7 @@
     "dev:hub": "tsx src/hub/index.ts",
     "seed:known-network": "tsx src/hub/bootstrapKnownNetwork.ts",
     "sync:tailscale": "tsx src/hub/syncTailscale.ts",
+    "verify:tailscale": "tsx src/hub/verifyTailscale.ts",
     "agent:windows": "tsx src/agent/windows.ts",
     "agent:linux": "tsx src/agent/linux.ts",
     "test": "node --test --import tsx"
