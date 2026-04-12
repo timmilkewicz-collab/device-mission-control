@@ -24,6 +24,12 @@ Start the hub:
 npm run dev:hub
 ```
 
+Seed the hub with the known nodes and links discovered so far:
+
+```bash
+npm run seed:known-network
+```
+
 Start the Windows agent:
 
 ```bash
