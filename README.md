@@ -42,6 +42,12 @@ Verify live Tailscale links and promote proven paths to `verified`:
 npm run verify:tailscale
 ```
 
+Verify the ProLiant SSH path once a login is known:
+
+```bash
+MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> npm run verify:proliant-ssh
+```
+
 Start the Windows agent:
 
 ```bash
@@ -63,6 +69,10 @@ Optional environment variables:
 - `MISSION_CONTROL_DISPLAY_NAME`: per-agent display name
 - `MISSION_CONTROL_INTERVAL_MS`: observation interval, default `30000`
 - `MISSION_WORKSPACE_ROOT`: optional path exposed by the `show_workspace_root` task
+- `MISSION_CONTROL_PROLIANT_SSH_HOST`: optional override for the ProLiant host, default `192.168.0.174`
+- `MISSION_CONTROL_PROLIANT_SSH_PORT`: optional override for the ProLiant SSH port, default `22`
+- `MISSION_CONTROL_PROLIANT_SSH_USER`: Linux username to verify the ProLiant SSH path
+- `MISSION_CONTROL_PROLIANT_SSH_KEY_PATH`: optional SSH private key path used by `npm run verify:proliant-ssh`
 
 ## Main endpoints
 
@@ -113,8 +123,9 @@ For Tailscale-connected machines, a practical local workflow is:
 1. `npm run seed:known-network`
 2. `npm run sync:tailscale`
 3. `npm run verify:tailscale`
-4. start the hub
-5. let outside agents discover it via `/.well-known/mission-control.json`
+4. `MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> npm run verify:proliant-ssh`
+5. start the hub
+6. let outside agents discover it via `/.well-known/mission-control.json`
 
 ## Dashboard workflow
 
@@ -150,6 +161,8 @@ The hub now tracks connection paths separately from nodes:
 This is the first practical step toward real cross-system execution because it gives connection work its own place in the model.
 
 For live Tailscale members, `npm run verify:tailscale` can now promote a path from `reachable` to `verified` when a one-shot Tailscale ping succeeds.
+
+For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability.
 
 ## Council bridge
 
