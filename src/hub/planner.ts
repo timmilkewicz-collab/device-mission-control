@@ -1,4 +1,4 @@
-import { DesktopControlEvaluation, DeviceRecord, HubState, Observation, PlanSnapshot, nowIso } from "../shared/types";
+import { DesktopControlEvaluation, DeviceRecord, HubState, NodeRecord, Observation, PlanSnapshot, nowIso } from "../shared/types";
 
 function getLatestObservation(state: HubState, deviceId: string): Observation | undefined {
   return [...state.observations].reverse().find((entry) => entry.deviceId === deviceId);
@@ -122,6 +122,59 @@ function collectSuggestedActions(state: HubState, devices: DeviceRecord[]): stri
   return Array.from(new Set(actions));
 }
 
+function collectSilentLoop(state: HubState, devices: DeviceRecord[], nodes: NodeRecord[]): string[] {
+  const loop: string[] = [];
+
+  for (const node of nodes) {
+    if (node.status === "partial" || node.status === "reachable") {
+      const pathHints = [
+        node.reachability.tailscale ? "tailscale" : undefined,
+        node.reachability.ssh ? "ssh" : undefined,
+        node.reachability.localAgent ? "local-agent" : undefined,
+        node.reachability.companion ? "companion" : undefined
+      ]
+        .filter(Boolean)
+        .join(", ");
+      loop.push(`Keep nudging ${node.label} toward active integration via ${pathHints || "known paths"}.`);
+    }
+
+    if (node.status === "offline") {
+      loop.push(`Recheck whether ${node.label} is reachable before routing work through it.`);
+    }
+  }
+
+  for (const device of devices) {
+    const observation = getLatestObservation(state, device.deviceId);
+    if (!observation || ageMinutes(observation.capturedAt) >= 15) {
+      loop.push(`Background follow-up: refresh context for ${device.displayName}.`);
+    }
+  }
+
+  const openCouncilSessions = state.councilSessions.filter((session) => session.status === "open");
+  for (const session of openCouncilSessions) {
+    if (session.responses.length === 0) {
+      loop.push(`Council session "${session.topic}" still needs first responses.`);
+      continue;
+    }
+
+    const hasBlocker = session.responses.some((response) => response.stance === "block");
+    const hasConcern = session.responses.some((response) => response.stance === "concern");
+
+    if (hasBlocker) {
+      loop.push(`Council session "${session.topic}" has a blocker to resolve quietly before the next run.`);
+    } else if (hasConcern) {
+      loop.push(`Council session "${session.topic}" has concerns worth revisiting in the next background pass.`);
+    }
+  }
+
+  const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
+  if (pendingApprovals.length > 0) {
+    loop.push(`Approval queue still has ${pendingApprovals.length} request(s) waiting.`);
+  }
+
+  return Array.from(new Set(loop));
+}
+
 function collectNotes(state: HubState, devices: DeviceRecord[]): string[] {
   const notes: string[] = [];
 
@@ -147,12 +200,14 @@ function collectNotes(state: HubState, devices: DeviceRecord[]): string[] {
 
 export function buildPlanSnapshot(state: HubState): PlanSnapshot {
   const devices = Object.values(state.devices);
+  const nodes = Object.values(state.nodes);
 
   return {
     createdAt: nowIso(),
     deviceSummaries: devices.map((device) => summarizeDevice(device, getLatestObservation(state, device.deviceId))),
     attention: collectAttention(state, devices),
     suggestedActions: collectSuggestedActions(state, devices),
+    silentLoop: collectSilentLoop(state, devices, nodes),
     notes: collectNotes(state, devices)
   };
 }

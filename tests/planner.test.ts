@@ -5,7 +5,29 @@ import { HubState } from "../src/shared/types";
 
 function buildState(): HubState {
   return {
-    nodes: {},
+    nodes: {
+      proliant: {
+        nodeId: "proliant",
+        label: "ProLiant Ubuntu Server",
+        kind: "server",
+        platform: "ubuntu",
+        status: "partial",
+        linkedNodeIds: [],
+        agentSurfaces: ["tailscale-ssh"],
+        capabilities: ["ssh"],
+        reachability: {
+          tailscale: true,
+          ssh: true,
+          localAgent: false,
+          companion: false,
+          notes: []
+        },
+        tags: ["tailscale"],
+        notes: ["Connected but not fully integrated."],
+        registeredAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    },
     devices: {
       win: {
         deviceId: "win",
@@ -54,6 +76,7 @@ test("buildPlanSnapshot summarizes the latest observation", () => {
   assert.equal(snapshot.deviceSummaries.length, 1);
   assert.match(snapshot.deviceSummaries[0] ?? "", /Windows Workstation/);
   assert.match(snapshot.notes[0] ?? "", /Editing the hub server/);
+  assert.ok(snapshot.silentLoop.some((item) => item.includes("ProLiant Ubuntu Server")));
 });
 
 test("desktop control readiness stays conservative without history", () => {

@@ -131,6 +131,7 @@ export const planSnapshotSchema = z.object({
   deviceSummaries: z.array(z.string()).default([]),
   attention: z.array(z.string()).default([]),
   suggestedActions: z.array(z.string()).default([]),
+  silentLoop: z.array(z.string()).default([]),
   notes: z.array(z.string()).default([])
 });
 export type PlanSnapshot = z.infer<typeof planSnapshotSchema>;

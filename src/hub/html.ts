@@ -78,6 +78,11 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
     </div>
 
     <section>
+      <h2>Silent Loop</h2>
+      <ul>${renderList(snapshot.silentLoop)}</ul>
+    </section>
+
+    <section>
       <h2>Notes</h2>
       <ul>${renderList(snapshot.notes)}</ul>
     </section>
