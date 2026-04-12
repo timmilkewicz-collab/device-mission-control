@@ -7,6 +7,7 @@ const linkId = "dhd-admin-to-proliant-ssh";
 const host = process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
 const user = process.env.MISSION_CONTROL_PROLIANT_SSH_USER;
 const keyPath = process.env.MISSION_CONTROL_PROLIANT_SSH_KEY_PATH;
+const password = process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
 const port = process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
 const checkedAt = new Date().toISOString();
 const successMarker = "mission-control-ssh-ok";
@@ -62,8 +63,48 @@ if (keyPath) {
 
 args.push(`${user}@${host}`, `echo ${successMarker}`);
 
+function verifyViaPassword(): string {
+  const script = `
+import os
+import paramiko
+
+client = paramiko.SSHClient()
+client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+client.connect(
+    hostname=os.environ["MC_HOST"],
+    port=int(os.environ["MC_PORT"]),
+    username=os.environ["MC_USER"],
+    password=os.environ["MC_PASSWORD"],
+    timeout=10,
+    allow_agent=False,
+    look_for_keys=False,
+)
+stdin, stdout, stderr = client.exec_command("echo ${successMarker}")
+output = stdout.read().decode().strip()
+err = stderr.read().decode().strip()
+client.close()
+if err:
+    raise SystemExit(err)
+print(output)
+`;
+
+  return execFileSync("py", ["-c", script], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      MC_HOST: host,
+      MC_PORT: port,
+      MC_USER: user,
+      MC_PASSWORD: password
+    }
+  }).trim();
+}
+
 try {
-  const output = execFileSync("ssh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  const output = password
+    ? verifyViaPassword()
+    : execFileSync("ssh", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const verified = output.includes(successMarker);
 
   store.upsertLink({
@@ -72,7 +113,7 @@ try {
     notes: [
       ...baseNotes,
       `SSH host ${host}:${port} is reachable and trusted from this machine.`,
-      `SSH auth succeeded for ${user}.`,
+      `SSH auth succeeded for ${user}${password ? " using password-backed verification." : "."}`,
       `SSH command output: ${output || "(empty output)"}`
     ],
     lastCheckedAt: checkedAt,

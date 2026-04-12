@@ -48,6 +48,12 @@ Verify the ProLiant SSH path once a login is known:
 MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> npm run verify:proliant-ssh
 ```
 
+Or, for a one-off verification when the server is still password-authenticated:
+
+```bash
+MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> MISSION_CONTROL_PROLIANT_SSH_PASSWORD=<password> npm run verify:proliant-ssh
+```
+
 Start the Windows agent:
 
 ```bash
@@ -73,6 +79,7 @@ Optional environment variables:
 - `MISSION_CONTROL_PROLIANT_SSH_PORT`: optional override for the ProLiant SSH port, default `22`
 - `MISSION_CONTROL_PROLIANT_SSH_USER`: Linux username to verify the ProLiant SSH path
 - `MISSION_CONTROL_PROLIANT_SSH_KEY_PATH`: optional SSH private key path used by `npm run verify:proliant-ssh`
+- `MISSION_CONTROL_PROLIANT_SSH_PASSWORD`: optional one-off password-backed verification path for `npm run verify:proliant-ssh`
 
 ## Main endpoints
 
@@ -162,7 +169,7 @@ This is the first practical step toward real cross-system execution because it g
 
 For live Tailscale members, `npm run verify:tailscale` can now promote a path from `reachable` to `verified` when a one-shot Tailscale ping succeeds.
 
-For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability.
+For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability. It can use either a key-based path or a one-off password-backed check when that is the only working login method.
 
 ## Council bridge
 
