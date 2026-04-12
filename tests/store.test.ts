@@ -82,3 +82,62 @@ test("store can upsert partially integrated nodes before a device agent exists",
   assert.equal(store.getNodes().length, 1);
   assert.equal(store.getNodes()[0]?.nodeId, "proliant-ubuntu");
 });
+
+test("store can upsert connection links between nodes", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mission-control-"));
+  const store = new MissionControlStore(path.join(tempDir, "state.json"));
+
+  store.upsertNode({
+    nodeId: "dell-2in1",
+    label: "Dell 2-in-1",
+    kind: "machine",
+    platform: "windows",
+    status: "reachable",
+    linkedNodeIds: [],
+    agentSurfaces: ["cursor"],
+    capabilities: ["council"],
+    reachability: {
+      tailscale: true,
+      ssh: false,
+      localAgent: false,
+      companion: false,
+      notes: []
+    },
+    tags: ["tailscale"],
+    notes: []
+  });
+
+  store.upsertNode({
+    nodeId: "windows-main",
+    label: "Windows Main",
+    kind: "machine",
+    platform: "windows",
+    status: "partial",
+    linkedNodeIds: [],
+    agentSurfaces: [],
+    capabilities: ["tasks"],
+    reachability: {
+      tailscale: true,
+      ssh: true,
+      localAgent: true,
+      companion: false,
+      notes: []
+    },
+    tags: ["tailscale"],
+    notes: []
+  });
+
+  const link = store.upsertLink({
+    linkId: "dell-to-main-ssh",
+    sourceNodeId: "dell-2in1",
+    targetNodeId: "windows-main",
+    transport: "ssh",
+    status: "attempting",
+    label: "Dell 2-in-1 to Windows Main over SSH",
+    notes: ["host setup in progress"]
+  });
+
+  assert.equal(link.status, "attempting");
+  assert.equal(store.getLinks().length, 1);
+  assert.equal(store.getLinks()[0]?.transport, "ssh");
+});

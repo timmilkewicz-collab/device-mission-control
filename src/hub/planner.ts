@@ -91,6 +91,11 @@ function collectAttention(state: HubState, devices: DeviceRecord[]): string[] {
     attention.push(`Task ${task.taskId} on ${task.deviceId} failed: ${task.resultSummary ?? "no summary provided"}.`);
   }
 
+  const blockedLinks = Object.values(state.links).filter((link) => link.status === "blocked" || link.status === "offline");
+  for (const link of blockedLinks) {
+    attention.push(`Link ${link.label} is ${link.status} and may block cross-system work.`);
+  }
+
   return attention;
 }
 
@@ -170,6 +175,13 @@ function collectSilentLoop(state: HubState, devices: DeviceRecord[], nodes: Node
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   if (pendingApprovals.length > 0) {
     loop.push(`Approval queue still has ${pendingApprovals.length} request(s) waiting.`);
+  }
+
+  const inProgressLinks = Object.values(state.links).filter(
+    (link) => link.status === "planned" || link.status === "attempting" || link.status === "reachable"
+  );
+  for (const link of inProgressLinks) {
+    loop.push(`Keep advancing link "${link.label}" from ${link.status} to verified.`);
   }
 
   return Array.from(new Set(loop));

@@ -5,6 +5,7 @@ import {
   councilResponseInputSchema,
   councilSessionInputSchema,
   deviceRegistrationSchema,
+  linkUpsertSchema,
   nodeUpsertSchema,
   observationSchema,
   taskDecisionSchema,
@@ -56,6 +57,10 @@ export function createHubServer(options: HubServerOptions) {
 
       if (method === "GET" && url.pathname === "/api/nodes") {
         return sendJson(response, 200, options.store.getNodes());
+      }
+
+      if (method === "GET" && url.pathname === "/api/links") {
+        return sendJson(response, 200, options.store.getLinks());
       }
 
       if (method === "GET" && url.pathname === "/api/approvals") {
@@ -162,6 +167,22 @@ export function createHubServer(options: HubServerOptions) {
         return redirect(response, "/");
       }
 
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/links") {
+        const form = await readFormBody(request);
+        const notes = (form.notes ?? "").split("\n").map((value) => value.trim()).filter(Boolean);
+        const input = linkUpsertSchema.parse({
+          linkId: form.linkId,
+          sourceNodeId: form.sourceNodeId,
+          targetNodeId: form.targetNodeId,
+          transport: form.transport,
+          status: form.status,
+          label: form.label,
+          notes
+        });
+        options.store.upsertLink(input);
+        return redirect(response, "/");
+      }
+
       if (!assertAuthorized(options.sharedToken, request.headers.authorization)) {
         return unauthorized(response);
       }
@@ -179,6 +200,11 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "POST" && url.pathname === "/api/nodes") {
         const input = nodeUpsertSchema.parse(await readJsonBody(request));
         return sendJson(response, 201, options.store.upsertNode(input));
+      }
+
+      if (method === "POST" && url.pathname === "/api/links") {
+        const input = linkUpsertSchema.parse(await readJsonBody(request));
+        return sendJson(response, 201, options.store.upsertLink(input));
       }
 
       if (method === "POST" && url.pathname === "/api/task-requests") {

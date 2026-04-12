@@ -22,6 +22,7 @@ function escapeHtml(value: string): string {
 
 export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options: DashboardOptions): string {
   const nodes = Object.values(state.nodes).sort((left, right) => left.label.localeCompare(right.label));
+  const links = Object.values(state.links).sort((left, right) => left.label.localeCompare(right.label));
   const devices = Object.values(state.devices);
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   const recentTasks = [...state.taskRequests].slice(-8).reverse();
@@ -142,6 +143,53 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
         nodes.length === 0
           ? "<p class=\"muted\">No nodes are registered yet.</p>"
           : `<div class="device-grid">${nodes.map(renderNodeCard).join("")}</div>`
+      }
+    </section>
+
+    <section>
+      <h2>Connection Links</h2>
+      ${
+        options.interactive
+          ? `<form method="post" action="/actions/links">
+              <div class="task-meta">Track actual cross-system paths such as Tailscale discovery, SSH setup, or local agent bridges.</div>
+              <div class="form-grid">
+                <label>Link id<br /><input name="linkId" required placeholder="dell-to-main-ssh" /></label>
+                <label>Label<br /><input name="label" required placeholder="Dell 2-in-1 to main machine over SSH" /></label>
+                <label>Source node id<br /><input name="sourceNodeId" required placeholder="dell-2in1" /></label>
+                <label>Target node id<br /><input name="targetNodeId" required placeholder="windows-main" /></label>
+              </div>
+              <div class="form-grid">
+                <label>Transport<br />
+                  <select name="transport">
+                    <option value="ssh">ssh</option>
+                    <option value="tailscale">tailscale</option>
+                    <option value="local-agent">local-agent</option>
+                    <option value="companion">companion</option>
+                    <option value="http">http</option>
+                  </select>
+                </label>
+                <label>Status<br />
+                  <select name="status">
+                    <option value="planned">planned</option>
+                    <option value="attempting" selected>attempting</option>
+                    <option value="reachable">reachable</option>
+                    <option value="verified">verified</option>
+                    <option value="blocked">blocked</option>
+                    <option value="offline">offline</option>
+                  </select>
+                </label>
+              </div>
+              <label>Notes<br /><textarea name="notes" rows="2" placeholder="SSH host setup in progress&#10;Tailscale path exists"></textarea></label>
+              <div class="button-row">
+                <button type="submit">Save Link</button>
+              </div>
+            </form>`
+          : "<p class=\"muted\">Link registration stays available through the JSON API when token protection is enabled.</p>"
+      }
+      ${
+        links.length === 0
+          ? "<p class=\"muted\">No connection links are registered yet.</p>"
+          : `<div class="device-grid">${links.map((link) => renderLinkCard(link, state.nodes)).join("")}</div>`
       }
     </section>
 
@@ -307,6 +355,19 @@ function renderNodeCard(node: HubState["nodes"][string]): string {
     <div class="task-meta">Reachability: ${escapeHtml(reachability || "unknown")}</div>
     ${node.linkedDeviceId ? `<div class="task-meta">Linked device: <code>${escapeHtml(node.linkedDeviceId)}</code></div>` : ""}
     ${node.notes.length > 0 ? `<ul>${node.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
+  </div>`;
+}
+
+function renderLinkCard(link: HubState["links"][string], nodes: HubState["nodes"]): string {
+  const sourceLabel = nodes[link.sourceNodeId]?.label ?? link.sourceNodeId;
+  const targetLabel = nodes[link.targetNodeId]?.label ?? link.targetNodeId;
+
+  return `<div class="task-card">
+    <div><strong>${escapeHtml(link.label)}</strong> <span class="muted">(${escapeHtml(link.transport)} / ${escapeHtml(link.status)})</span></div>
+    <div class="task-meta"><code>${escapeHtml(link.linkId)}</code></div>
+    <div class="task-meta">${escapeHtml(sourceLabel)} -> ${escapeHtml(targetLabel)}</div>
+    ${link.lastCheckedAt ? `<div class="task-meta">Last checked: ${escapeHtml(link.lastCheckedAt)}</div>` : ""}
+    ${link.notes.length > 0 ? `<ul>${link.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
   </div>`;
 }
 

@@ -183,6 +183,27 @@ export const nodeRecordSchema = z.object({
 });
 export type NodeRecord = z.infer<typeof nodeRecordSchema>;
 
+export const linkTransportSchema = z.enum(["tailscale", "ssh", "local-agent", "companion", "http"]);
+export type LinkTransport = z.infer<typeof linkTransportSchema>;
+
+export const linkStatusSchema = z.enum(["planned", "attempting", "reachable", "verified", "blocked", "offline"]);
+export type LinkStatus = z.infer<typeof linkStatusSchema>;
+
+export const linkRecordSchema = z.object({
+  linkId: z.string().min(1),
+  sourceNodeId: z.string().min(1),
+  targetNodeId: z.string().min(1),
+  transport: linkTransportSchema,
+  status: linkStatusSchema,
+  label: z.string().min(1),
+  notes: z.array(z.string()).default([]),
+  lastCheckedAt: z.string().optional(),
+  lastSucceededAt: z.string().optional(),
+  registeredAt: z.string().min(1),
+  updatedAt: z.string().min(1)
+});
+export type LinkRecord = z.infer<typeof linkRecordSchema>;
+
 export const taskRequestInputSchema = z.object({
   deviceId: z.string().min(1),
   taskId: z.string().min(1),
@@ -252,6 +273,7 @@ export type CouncilSession = z.infer<typeof councilSessionSchema>;
 
 export const hubStateSchema = z.object({
   nodes: z.record(z.string(), nodeRecordSchema).default({}),
+  links: z.record(z.string(), linkRecordSchema).default({}),
   devices: z.record(z.string(), deviceRecordSchema).default({}),
   observations: z.array(observationSchema).default([]),
   taskRequests: z.array(taskRequestSchema).default([]),
@@ -283,6 +305,19 @@ export const nodeUpsertSchema = z.object({
   lastSeenAt: z.string().optional()
 });
 export type NodeUpsertInput = z.infer<typeof nodeUpsertSchema>;
+
+export const linkUpsertSchema = z.object({
+  linkId: z.string().min(1),
+  sourceNodeId: z.string().min(1),
+  targetNodeId: z.string().min(1),
+  transport: linkTransportSchema,
+  status: linkStatusSchema.default("planned"),
+  label: z.string().min(1),
+  notes: z.array(z.string()).default([]),
+  lastCheckedAt: z.string().optional(),
+  lastSucceededAt: z.string().optional()
+});
+export type LinkUpsertInput = z.infer<typeof linkUpsertSchema>;
 
 export function nowIso(): string {
   return new Date().toISOString();

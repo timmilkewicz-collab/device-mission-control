@@ -6,6 +6,8 @@ import {
   CouncilSessionInput,
   DeviceRegistration,
   HubState,
+  LinkRecord,
+  LinkUpsertInput,
   NodeRecord,
   NodeUpsertInput,
   Observation,
@@ -31,6 +33,29 @@ export class MissionControlStore {
 
   getState(): HubState {
     return structuredClone(this.state);
+  }
+
+  upsertLink(input: LinkUpsertInput): LinkRecord {
+    const timestamp = nowIso();
+    const existing = this.state.links[input.linkId];
+    const link: LinkRecord = {
+      linkId: input.linkId,
+      sourceNodeId: input.sourceNodeId,
+      targetNodeId: input.targetNodeId,
+      transport: input.transport,
+      status: input.status,
+      label: input.label,
+      notes: input.notes,
+      lastCheckedAt: input.lastCheckedAt,
+      lastSucceededAt: input.lastSucceededAt ?? existing?.lastSucceededAt,
+      registeredAt: existing?.registeredAt ?? timestamp,
+      updatedAt: timestamp
+    };
+
+    this.state.links[input.linkId] = link;
+    this.refreshDerivedState();
+    this.save();
+    return link;
   }
 
   registerDevice(input: DeviceRegistration) {
@@ -269,6 +294,10 @@ export class MissionControlStore {
 
   getNodes(): NodeRecord[] {
     return Object.values(this.state.nodes).sort((left, right) => left.label.localeCompare(right.label));
+  }
+
+  getLinks(): LinkRecord[] {
+    return Object.values(this.state.links).sort((left, right) => left.label.localeCompare(right.label));
   }
 
   getLatestPlan(): PlanSnapshot {

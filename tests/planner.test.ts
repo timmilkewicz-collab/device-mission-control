@@ -28,6 +28,19 @@ function buildState(): HubState {
         updatedAt: new Date().toISOString()
       }
     },
+    links: {
+      dellToMain: {
+        linkId: "dell-to-main-ssh",
+        sourceNodeId: "proliant",
+        targetNodeId: "win",
+        transport: "ssh",
+        status: "attempting",
+        label: "ProLiant to Windows over SSH",
+        notes: ["setup in progress"],
+        registeredAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    },
     devices: {
       win: {
         deviceId: "win",
@@ -77,6 +90,7 @@ test("buildPlanSnapshot summarizes the latest observation", () => {
   assert.match(snapshot.deviceSummaries[0] ?? "", /Windows Workstation/);
   assert.match(snapshot.notes[0] ?? "", /Editing the hub server/);
   assert.ok(snapshot.silentLoop.some((item) => item.includes("ProLiant Ubuntu Server")));
+  assert.ok(snapshot.silentLoop.some((item) => item.includes("ProLiant to Windows over SSH")));
 });
 
 test("desktop control readiness stays conservative without history", () => {
