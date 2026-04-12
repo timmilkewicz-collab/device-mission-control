@@ -30,6 +30,12 @@ Seed the hub with the known nodes and links discovered so far:
 npm run seed:known-network
 ```
 
+Refresh node and link status from the live tailnet:
+
+```bash
+npm run sync:tailscale
+```
+
 Start the Windows agent:
 
 ```bash
@@ -95,6 +101,13 @@ Recommended startup flow for outside agents:
 3. fetch `/api/nodes`
 4. fetch `/api/links`
 5. then decide whether to register, observe, respond to council, or request/execute tasks
+
+For Tailscale-connected machines, a practical local workflow is:
+
+1. `npm run seed:known-network`
+2. `npm run sync:tailscale`
+3. start the hub
+4. let outside agents discover it via `/.well-known/mission-control.json`
 
 ## Dashboard workflow
 

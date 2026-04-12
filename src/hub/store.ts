@@ -35,6 +35,28 @@ export class MissionControlStore {
     return structuredClone(this.state);
   }
 
+  deleteNode(nodeId: string): boolean {
+    if (!(nodeId in this.state.nodes)) {
+      return false;
+    }
+
+    delete this.state.nodes[nodeId];
+    this.refreshDerivedState();
+    this.save();
+    return true;
+  }
+
+  deleteLink(linkId: string): boolean {
+    if (!(linkId in this.state.links)) {
+      return false;
+    }
+
+    delete this.state.links[linkId];
+    this.refreshDerivedState();
+    this.save();
+    return true;
+  }
+
   upsertLink(input: LinkUpsertInput): LinkRecord {
     const timestamp = nowIso();
     const existing = this.state.links[input.linkId];
