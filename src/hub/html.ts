@@ -1,6 +1,7 @@
-import { CouncilSession, HubState, PlanSnapshot, TaskRequest } from "../shared/types";
+import { CouncilSession, HubState, PeerInboxMessage, PlanSnapshot, TaskRequest } from "../shared/types";
 
 type DashboardOptions = {
+  inboxMessages: PeerInboxMessage[];
   interactive: boolean;
 };
 
@@ -27,6 +28,7 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   const recentTasks = [...state.taskRequests].slice(-8).reverse();
   const councilSessions = [...state.councilSessions].slice(-6).reverse();
+  const inboxMessages = options.inboxMessages;
 
   return `<!doctype html>
 <html lang="en">
@@ -86,6 +88,42 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
     <section>
       <h2>Notes</h2>
       <ul>${renderList(snapshot.notes)}</ul>
+    </section>
+
+    <section>
+      <h2>Peer Inbox</h2>
+      ${
+        options.interactive
+          ? `<form method="post" action="/actions/inbox">
+              <div class="form-grid">
+                <label>Role<br />
+                  <select name="role">
+                    <option value="codex">codex</option>
+                    <option value="cursor">cursor</option>
+                    <option value="human">human</option>
+                  </select>
+                </label>
+              </div>
+              <label>Message<br /><textarea name="text" rows="3" required placeholder="Send a bridge message to other agents or operators."></textarea></label>
+              <div class="button-row">
+                <button type="submit">Send Message</button>
+                <button type="button" class="secondary" onclick="window.location.reload()">Refresh</button>
+              </div>
+            </form>`
+          : "<p class=\"muted\">Peer inbox writes stay available through /v1/inbox when token protection is enabled.</p>"
+      }
+      ${
+        inboxMessages.length === 0
+          ? "<p class=\"muted\">No peer messages yet.</p>"
+          : `<ul>${inboxMessages
+              .map(
+                (message) =>
+                  `<li><strong>${escapeHtml(message.role)}</strong> <span class="muted">${escapeHtml(message.ts)}</span><br />${escapeHtml(
+                    message.text
+                  )}</li>`
+              )
+              .join("")}</ul>`
+      }
     </section>
 
     <section>

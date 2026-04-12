@@ -246,6 +246,23 @@ export type TaskResultInput = z.infer<typeof taskResultInputSchema>;
 export const councilSessionStatusSchema = z.enum(["open", "closed"]);
 export type CouncilSessionStatus = z.infer<typeof councilSessionStatusSchema>;
 
+export const peerInboxRoleSchema = z.enum(["cursor", "codex", "human"]);
+export type PeerInboxRole = z.infer<typeof peerInboxRoleSchema>;
+
+export const peerInboxMessageSchema = z.object({
+  id: z.string().min(1),
+  ts: z.string().min(1),
+  role: peerInboxRoleSchema,
+  text: z.string().min(1)
+});
+export type PeerInboxMessage = z.infer<typeof peerInboxMessageSchema>;
+
+export const peerInboxInputSchema = z.object({
+  role: peerInboxRoleSchema,
+  text: z.string().min(1)
+});
+export type PeerInboxInput = z.infer<typeof peerInboxInputSchema>;
+
 export const councilResponseSchema = z.object({
   id: z.string().min(1),
   memberId: z.string().min(1),

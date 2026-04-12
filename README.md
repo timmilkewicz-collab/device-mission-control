@@ -92,6 +92,8 @@ Optional environment variables:
 ## Main endpoints
 
 - `GET /`: HTML dashboard
+- `GET /v1/inbox?limit=50`: peer inbox messages, newest first
+- `POST /v1/inbox`: append a peer inbox message with `{ "role": "cursor" | "codex" | "human", "text": "..." }`
 - `GET /.well-known/mission-control.json`: discovery manifest for agents and other machines
 - `GET /api/nodes`: registered network nodes and partial integrations
 - `GET /api/links`: registered connection paths between nodes
@@ -181,6 +183,23 @@ For live Tailscale members, `npm run verify:tailscale` can now promote a path fr
 For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability. It can use either a key-based path or a one-off password-backed check when that is the only working login method.
 
 `npm run collect:proliant` is the first real cross-node run in the repo: it logs into the verified ProLiant SSH path, registers the server as a Linux device if needed, and stores a live observation with services, top processes, containers, and uptime in the hub state.
+
+## Peer inbox
+
+The hub now includes a lightweight shared bus for people and agents to talk over the tailnet without assuming a private Codex backchannel:
+
+- storage: `.mission-control/data/inbox.jsonl`
+- `POST /v1/inbox` to append `{ "role": "cursor" | "codex" | "human", "text": "..." }`
+- `GET /v1/inbox?limit=50` to read recent messages, newest first
+- the dashboard includes a `Peer Inbox` section for sending and refreshing messages
+
+Example from another Tailscale machine:
+
+```bash
+curl -X POST "http://dhd-admin.tail833d79.ts.net:8787/v1/inbox" \
+  -H "content-type: application/json" \
+  -d "{\"role\":\"cursor\",\"text\":\"Remote bridge is up on the Dell 2-in-1.\"}"
+```
 
 ## Council bridge
 

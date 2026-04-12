@@ -8,16 +8,19 @@ import {
   linkUpsertSchema,
   nodeUpsertSchema,
   observationSchema,
+  peerInboxInputSchema,
   taskDecisionSchema,
   taskRequestInputSchema,
   taskResultInputSchema
 } from "../shared/types";
+import { PeerInboxStore } from "./inbox";
 import { renderDashboard } from "./html";
 import { MissionControlStore } from "./store";
 
 type HubServerOptions = {
   port: number;
   store: MissionControlStore;
+  inbox: PeerInboxStore;
   sharedToken?: string;
 };
 
@@ -100,9 +103,17 @@ export function createHubServer(options: HubServerOptions) {
         return sendHtml(
           response,
           renderDashboard(options.store.getState(), options.store.getLatestPlan(), {
+            inboxMessages: options.inbox.list(50),
             interactive: !options.sharedToken
           })
         );
+      }
+
+      if (method === "GET" && url.pathname === "/v1/inbox") {
+        const limit = Number(url.searchParams.get("limit") ?? "50");
+        return sendJson(response, 200, {
+          messages: options.inbox.list(Number.isFinite(limit) ? Math.max(1, Math.min(limit, 200)) : 50)
+        });
       }
 
       if (method === "GET" && url.pathname === "/.well-known/mission-control.json") {
@@ -248,8 +259,23 @@ export function createHubServer(options: HubServerOptions) {
         return redirect(response, "/");
       }
 
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/inbox") {
+        const form = await readFormBody(request);
+        const input = peerInboxInputSchema.parse({
+          role: form.role,
+          text: form.text
+        });
+        options.inbox.append(input);
+        return redirect(response, "/");
+      }
+
       if (!assertAuthorized(options.sharedToken, request.headers.authorization)) {
         return unauthorized(response);
+      }
+
+      if (method === "POST" && url.pathname === "/v1/inbox") {
+        const input = peerInboxInputSchema.parse(await readJsonBody(request));
+        return sendJson(response, 201, options.inbox.append(input));
       }
 
       if (method === "POST" && url.pathname === "/api/devices/register") {
