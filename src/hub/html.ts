@@ -21,6 +21,7 @@ function escapeHtml(value: string): string {
 }
 
 export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options: DashboardOptions): string {
+  const nodes = Object.values(state.nodes).sort((left, right) => left.label.localeCompare(right.label));
   const devices = Object.values(state.devices);
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   const recentTasks = [...state.taskRequests].slice(-8).reverse();
@@ -51,6 +52,7 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
       .muted { color: #94a3b8; }
       .task-meta { margin: 8px 0; color: #cbd5e1; }
       input, textarea { width: 100%; box-sizing: border-box; margin-top: 4px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #475569; background: #020617; color: #e2e8f0; padding: 8px 10px; }
+      select { width: 100%; box-sizing: border-box; margin-top: 4px; margin-bottom: 12px; border-radius: 8px; border: 1px solid #475569; background: #020617; color: #e2e8f0; padding: 8px 10px; }
       .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
     </style>
   </head>
@@ -78,6 +80,64 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
     <section>
       <h2>Notes</h2>
       <ul>${renderList(snapshot.notes)}</ul>
+    </section>
+
+    <section>
+      <h2>Node Registry</h2>
+      ${
+        options.interactive
+          ? `<form method="post" action="/actions/nodes">
+              <div class="task-meta">Register machines, apps, mobile devices, or partially integrated nodes on the network.</div>
+              <div class="form-grid">
+                <label>Node id<br /><input name="nodeId" required placeholder="proliant-ubuntu" /></label>
+                <label>Label<br /><input name="label" required placeholder="ProLiant Ubuntu Server" /></label>
+                <label>Kind<br />
+                  <select name="kind">
+                    <option value="machine">machine</option>
+                    <option value="server">server</option>
+                    <option value="mobile">mobile</option>
+                    <option value="wearable">wearable</option>
+                    <option value="agent">agent</option>
+                    <option value="app">app</option>
+                  </select>
+                </label>
+                <label>Status<br />
+                  <select name="status">
+                    <option value="discovered">discovered</option>
+                    <option value="reachable">reachable</option>
+                    <option value="partial" selected>partial</option>
+                    <option value="active">active</option>
+                    <option value="offline">offline</option>
+                  </select>
+                </label>
+                <label>Platform<br /><input name="platform" required placeholder="ubuntu" /></label>
+                <label>Linked device id<br /><input name="linkedDeviceId" placeholder="linux-home-server" /></label>
+              </div>
+              <div class="form-grid">
+                <label>Linked node ids<br /><input name="linkedNodeIds" placeholder="galaxy-s25, galaxy-watch-8" /></label>
+                <label>Agent surfaces<br /><input name="agentSurfaces" placeholder="cursor, mission-control-agent" /></label>
+                <label>Capabilities<br /><input name="capabilities" placeholder="ssh, logs, council" /></label>
+                <label>Tags<br /><input name="tags" placeholder="tailscale, partial, proliant" /></label>
+              </div>
+              <div class="form-grid">
+                <label>Tailscale<br /><select name="tailscale"><option value="true">true</option><option value="false">false</option></select></label>
+                <label>SSH<br /><select name="ssh"><option value="true">true</option><option value="false">false</option></select></label>
+                <label>Local agent<br /><select name="localAgent"><option value="false">false</option><option value="true">true</option></select></label>
+                <label>Companion link<br /><select name="companion"><option value="false">false</option><option value="true">true</option></select></label>
+              </div>
+              <label>Reachability notes<br /><textarea name="reachabilityNotes" rows="2" placeholder="reachable on tailnet&#10;ssh not wired yet"></textarea></label>
+              <label>Notes<br /><textarea name="notes" rows="2" placeholder="partial integration&#10;ubuntu on ProLiant"></textarea></label>
+              <div class="button-row">
+                <button type="submit">Save Node</button>
+              </div>
+            </form>`
+          : "<p class=\"muted\">Node registration stays available through the JSON API when token protection is enabled.</p>"
+      }
+      ${
+        nodes.length === 0
+          ? "<p class=\"muted\">No nodes are registered yet.</p>"
+          : `<div class="device-grid">${nodes.map(renderNodeCard).join("")}</div>`
+      }
     </section>
 
     <section>
@@ -222,6 +282,27 @@ function renderRecentTask(task: TaskRequest): string {
   return `<li><code>${escapeHtml(task.deviceId)}</code> <strong>${escapeHtml(task.taskId)}</strong> is ${escapeHtml(
     task.status
   )}${detail}</li>`;
+}
+
+function renderNodeCard(node: HubState["nodes"][string]): string {
+  const surfaces = node.agentSurfaces.length > 0 ? node.agentSurfaces.join(", ") : "none";
+  const reachability = [
+    node.reachability.tailscale ? "tailscale" : undefined,
+    node.reachability.ssh ? "ssh" : undefined,
+    node.reachability.localAgent ? "local-agent" : undefined,
+    node.reachability.companion ? "companion" : undefined
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return `<div class="task-card">
+    <div><strong>${escapeHtml(node.label)}</strong> <span class="muted">(${escapeHtml(node.kind)} / ${escapeHtml(node.status)})</span></div>
+    <div class="task-meta"><code>${escapeHtml(node.nodeId)}</code> on ${escapeHtml(node.platform)}</div>
+    <div class="task-meta">Surfaces: ${escapeHtml(surfaces)}</div>
+    <div class="task-meta">Reachability: ${escapeHtml(reachability || "unknown")}</div>
+    ${node.linkedDeviceId ? `<div class="task-meta">Linked device: <code>${escapeHtml(node.linkedDeviceId)}</code></div>` : ""}
+    ${node.notes.length > 0 ? `<ul>${node.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
+  </div>`;
 }
 
 function renderCouncilSession(session: CouncilSession, interactive: boolean): string {

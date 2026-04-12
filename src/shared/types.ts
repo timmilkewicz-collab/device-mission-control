@@ -142,6 +142,46 @@ export const desktopControlEvaluationSchema = z.object({
 });
 export type DesktopControlEvaluation = z.infer<typeof desktopControlEvaluationSchema>;
 
+export const nodeKindSchema = z.enum(["machine", "mobile", "wearable", "server", "agent", "app"]);
+export type NodeKind = z.infer<typeof nodeKindSchema>;
+
+export const integrationStatusSchema = z.enum(["discovered", "reachable", "partial", "active", "offline"]);
+export type IntegrationStatus = z.infer<typeof integrationStatusSchema>;
+
+export const reachabilitySchema = z.object({
+  tailscale: z.boolean().default(false),
+  ssh: z.boolean().default(false),
+  localAgent: z.boolean().default(false),
+  companion: z.boolean().default(false),
+  notes: z.array(z.string()).default([])
+});
+export type Reachability = z.infer<typeof reachabilitySchema>;
+
+export const nodeRecordSchema = z.object({
+  nodeId: z.string().min(1),
+  label: z.string().min(1),
+  kind: nodeKindSchema,
+  platform: z.string().min(1),
+  status: integrationStatusSchema,
+  linkedDeviceId: z.string().optional(),
+  linkedNodeIds: z.array(z.string()).default([]),
+  agentSurfaces: z.array(z.string()).default([]),
+  capabilities: z.array(z.string()).default([]),
+  reachability: reachabilitySchema.default({
+    tailscale: false,
+    ssh: false,
+    localAgent: false,
+    companion: false,
+    notes: []
+  }),
+  tags: z.array(z.string()).default([]),
+  notes: z.array(z.string()).default([]),
+  lastSeenAt: z.string().optional(),
+  registeredAt: z.string().min(1),
+  updatedAt: z.string().min(1)
+});
+export type NodeRecord = z.infer<typeof nodeRecordSchema>;
+
 export const taskRequestInputSchema = z.object({
   deviceId: z.string().min(1),
   taskId: z.string().min(1),
@@ -210,6 +250,7 @@ export const councilSessionSchema = z.object({
 export type CouncilSession = z.infer<typeof councilSessionSchema>;
 
 export const hubStateSchema = z.object({
+  nodes: z.record(z.string(), nodeRecordSchema).default({}),
   devices: z.record(z.string(), deviceRecordSchema).default({}),
   observations: z.array(observationSchema).default([]),
   taskRequests: z.array(taskRequestSchema).default([]),
@@ -218,6 +259,29 @@ export const hubStateSchema = z.object({
   desktopControlEvaluation: desktopControlEvaluationSchema.optional()
 });
 export type HubState = z.infer<typeof hubStateSchema>;
+
+export const nodeUpsertSchema = z.object({
+  nodeId: z.string().min(1),
+  label: z.string().min(1),
+  kind: nodeKindSchema,
+  platform: z.string().min(1),
+  status: integrationStatusSchema.default("discovered"),
+  linkedDeviceId: z.string().optional(),
+  linkedNodeIds: z.array(z.string()).default([]),
+  agentSurfaces: z.array(z.string()).default([]),
+  capabilities: z.array(z.string()).default([]),
+  reachability: reachabilitySchema.default({
+    tailscale: false,
+    ssh: false,
+    localAgent: false,
+    companion: false,
+    notes: []
+  }),
+  tags: z.array(z.string()).default([]),
+  notes: z.array(z.string()).default([]),
+  lastSeenAt: z.string().optional()
+});
+export type NodeUpsertInput = z.infer<typeof nodeUpsertSchema>;
 
 export function nowIso(): string {
   return new Date().toISOString();

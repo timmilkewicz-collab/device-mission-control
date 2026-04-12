@@ -5,6 +5,7 @@ import { HubState } from "../src/shared/types";
 
 function buildState(): HubState {
   return {
+    nodes: {},
     devices: {
       win: {
         deviceId: "win",

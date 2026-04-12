@@ -50,4 +50,35 @@ test("store registers devices and creates approval-gated task requests", () => {
 
   assert.equal(approved.status, "approved");
   assert.equal(store.getApprovedTasks("win").length, 1);
+  assert.equal(store.getNodes().length, 1);
+  assert.equal(store.getNodes()[0]?.linkedDeviceId, "win");
+});
+
+test("store can upsert partially integrated nodes before a device agent exists", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mission-control-"));
+  const store = new MissionControlStore(path.join(tempDir, "state.json"));
+
+  const node = store.upsertNode({
+    nodeId: "proliant-ubuntu",
+    label: "ProLiant Ubuntu Server",
+    kind: "server",
+    platform: "ubuntu",
+    status: "partial",
+    linkedNodeIds: [],
+    agentSurfaces: ["tailscale-ssh"],
+    capabilities: ["ssh", "logs"],
+    reachability: {
+      tailscale: true,
+      ssh: true,
+      localAgent: false,
+      companion: false,
+      notes: ["reachable on tailnet"]
+    },
+    tags: ["tailscale", "partial"],
+    notes: ["Connected but not fully integrated yet."]
+  });
+
+  assert.equal(node.status, "partial");
+  assert.equal(store.getNodes().length, 1);
+  assert.equal(store.getNodes()[0]?.nodeId, "proliant-ubuntu");
 });

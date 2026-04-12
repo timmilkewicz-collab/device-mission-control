@@ -5,6 +5,7 @@ import {
   councilResponseInputSchema,
   councilSessionInputSchema,
   deviceRegistrationSchema,
+  nodeUpsertSchema,
   observationSchema,
   taskDecisionSchema,
   taskRequestInputSchema,
@@ -51,6 +52,10 @@ export function createHubServer(options: HubServerOptions) {
 
       if (method === "GET" && url.pathname === "/api/devices") {
         return sendJson(response, 200, Object.values(options.store.getState().devices));
+      }
+
+      if (method === "GET" && url.pathname === "/api/nodes") {
+        return sendJson(response, 200, options.store.getNodes());
       }
 
       if (method === "GET" && url.pathname === "/api/approvals") {
@@ -125,6 +130,38 @@ export function createHubServer(options: HubServerOptions) {
         return redirect(response, "/");
       }
 
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/nodes") {
+        const form = await readFormBody(request);
+        const tags = (form.tags ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+        const notes = (form.notes ?? "").split("\n").map((value) => value.trim()).filter(Boolean);
+        const linkedNodeIds = (form.linkedNodeIds ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+        const agentSurfaces = (form.agentSurfaces ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+        const capabilities = (form.capabilities ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+        const reachabilityNotes = (form.reachabilityNotes ?? "").split("\n").map((value) => value.trim()).filter(Boolean);
+        const input = nodeUpsertSchema.parse({
+          nodeId: form.nodeId,
+          label: form.label,
+          kind: form.kind,
+          platform: form.platform,
+          status: form.status,
+          linkedDeviceId: form.linkedDeviceId || undefined,
+          linkedNodeIds,
+          agentSurfaces,
+          capabilities,
+          tags,
+          notes,
+          reachability: {
+            tailscale: form.tailscale === "true",
+            ssh: form.ssh === "true",
+            localAgent: form.localAgent === "true",
+            companion: form.companion === "true",
+            notes: reachabilityNotes
+          }
+        });
+        options.store.upsertNode(input);
+        return redirect(response, "/");
+      }
+
       if (!assertAuthorized(options.sharedToken, request.headers.authorization)) {
         return unauthorized(response);
       }
@@ -137,6 +174,11 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "POST" && url.pathname === "/api/observations") {
         const input = observationSchema.parse(await readJsonBody(request));
         return sendJson(response, 201, options.store.addObservation(input));
+      }
+
+      if (method === "POST" && url.pathname === "/api/nodes") {
+        const input = nodeUpsertSchema.parse(await readJsonBody(request));
+        return sendJson(response, 201, options.store.upsertNode(input));
       }
 
       if (method === "POST" && url.pathname === "/api/task-requests") {

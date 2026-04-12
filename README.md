@@ -4,7 +4,7 @@ Observer-first mission control for a Windows workstation, a Linux/home-server ag
 
 ## What is implemented
 
-- `hub`: HTTP dashboard and API for devices, observations, plan snapshots, task requests, approvals, and council sessions
+- `hub`: HTTP dashboard and API for nodes, devices, observations, plan snapshots, task requests, approvals, and council sessions
 - `windows agent`: reports active window, screenshot attempts, services, and processes
 - `linux agent`: reports active window/workspace when available, screenshot attempts, services, processes, and containers
 - `shared protocol`: validated schemas for registrations, observations, task requests, approvals, and desktop-control readiness
@@ -49,11 +49,13 @@ Optional environment variables:
 ## Main endpoints
 
 - `GET /`: HTML dashboard
+- `GET /api/nodes`: registered network nodes and partial integrations
 - `GET /api/state`: raw state plus latest plan snapshot
 - `GET /api/approvals`: pending task approvals
 - `GET /api/council/sessions`: current and recent council sessions
 - `GET /api/desktop-control/evaluation`: readiness gate output
 - `POST /api/devices/register`: register or refresh a device
+- `POST /api/nodes`: create or update a node registry entry
 - `POST /api/observations`: submit an observation
 - `POST /api/task-requests`: request a named task
 - `POST /api/task-requests/:id/decision`: approve or reject a task
@@ -72,6 +74,17 @@ When `MISSION_CONTROL_TOKEN` is not set, the dashboard can drive the observer-fi
 - open council sessions to gather input from multiple machines or external agents
 
 If `MISSION_CONTROL_TOKEN` is set, browser forms stay disabled by policy and task mutations should go through the JSON API with a bearer token.
+
+## Node registry
+
+The hub now tracks nodes separately from device observations so partially integrated members can appear early:
+
+- represent machines, servers, apps, agents, phones, and wearables
+- track reachability such as Tailscale, SSH, local agents, or companion links
+- mark integration state as discovered, reachable, partial, active, or offline
+- link a node to a mission-control device id when a full agent is available
+
+This lets the tailnet map grow before every member is fully instrumented.
 
 ## Council bridge
 

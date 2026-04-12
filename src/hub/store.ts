@@ -6,6 +6,8 @@ import {
   CouncilSessionInput,
   DeviceRegistration,
   HubState,
+  NodeRecord,
+  NodeUpsertInput,
   Observation,
   PlanSnapshot,
   TaskDecisionInput,
@@ -41,6 +43,31 @@ export class MissionControlStore {
       lastSeenAt: timestamp
     };
 
+    const existingNode = this.state.nodes[input.deviceId];
+    this.state.nodes[input.deviceId] = {
+      nodeId: input.deviceId,
+      label: input.displayName,
+      kind: input.platform === "windows" ? "machine" : input.tags.includes("server") ? "server" : "machine",
+      platform: input.platform,
+      status: "active",
+      linkedDeviceId: input.deviceId,
+      linkedNodeIds: existingNode?.linkedNodeIds ?? [],
+      agentSurfaces: Array.from(new Set([...(existingNode?.agentSurfaces ?? []), "mission-control-agent"])),
+      capabilities: input.capabilities,
+      reachability: existingNode?.reachability ?? {
+        tailscale: false,
+        ssh: input.platform === "linux",
+        localAgent: true,
+        companion: false,
+        notes: []
+      },
+      tags: Array.from(new Set(input.tags)),
+      notes: existingNode?.notes ?? [],
+      lastSeenAt: timestamp,
+      registeredAt: existingNode?.registeredAt ?? timestamp,
+      updatedAt: timestamp
+    };
+
     this.refreshDerivedState();
     this.save();
     return this.state.devices[input.deviceId];
@@ -53,11 +80,47 @@ export class MissionControlStore {
       device.taskCatalog = observation.taskCatalog;
     }
 
+    const node = this.state.nodes[observation.deviceId];
+    if (node) {
+      node.lastSeenAt = observation.capturedAt;
+      node.updatedAt = nowIso();
+      if (node.status === "discovered" || node.status === "reachable" || node.status === "partial") {
+        node.status = "active";
+      }
+    }
+
     this.state.observations.push(observation);
     this.state.observations = this.state.observations.slice(-250);
     this.refreshDerivedState();
     this.save();
     return observation;
+  }
+
+  upsertNode(input: NodeUpsertInput): NodeRecord {
+    const timestamp = nowIso();
+    const existing = this.state.nodes[input.nodeId];
+    const node: NodeRecord = {
+      nodeId: input.nodeId,
+      label: input.label,
+      kind: input.kind,
+      platform: input.platform,
+      status: input.status,
+      linkedDeviceId: input.linkedDeviceId,
+      linkedNodeIds: input.linkedNodeIds,
+      agentSurfaces: input.agentSurfaces,
+      capabilities: input.capabilities,
+      reachability: input.reachability,
+      tags: input.tags,
+      notes: input.notes,
+      lastSeenAt: input.lastSeenAt ?? existing?.lastSeenAt,
+      registeredAt: existing?.registeredAt ?? timestamp,
+      updatedAt: timestamp
+    };
+
+    this.state.nodes[input.nodeId] = node;
+    this.refreshDerivedState();
+    this.save();
+    return node;
   }
 
   createCouncilSession(input: CouncilSessionInput): CouncilSession {
@@ -202,6 +265,10 @@ export class MissionControlStore {
 
   getCouncilSessions(): CouncilSession[] {
     return [...this.state.councilSessions].reverse();
+  }
+
+  getNodes(): NodeRecord[] {
+    return Object.values(this.state.nodes).sort((left, right) => left.label.localeCompare(right.label));
   }
 
   getLatestPlan(): PlanSnapshot {
