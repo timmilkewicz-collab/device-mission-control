@@ -32,5 +32,19 @@ export function getTailscaleStatus(): TailscaleStatus {
 }
 
 export function pingTailscalePeer(target: string): string {
-  return execFileSync("tailscale", ["ping", "--c", "1", "--timeout", "5s", target], { encoding: "utf8" }).trim();
+  try {
+    return execFileSync("tailscale", ["ping", "--c", "1", "--timeout", "5s", target], { encoding: "utf8" }).trim();
+  } catch (error) {
+    const stdout =
+      error && typeof error === "object" && "stdout" in error && error.stdout ? String(error.stdout).trim() : "";
+    const stderr =
+      error && typeof error === "object" && "stderr" in error && error.stderr ? String(error.stderr).trim() : "";
+    const combined = [stdout, stderr].filter(Boolean).join("\n").trim();
+
+    if (/^pong from /im.test(combined)) {
+      return combined;
+    }
+
+    throw error;
+  }
 }

@@ -6,7 +6,14 @@ const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const checkedAt = new Date().toISOString();
 const status = getTailscaleStatus();
 const selfNodeId = normalizeNodeId(status.Self.HostName);
-const verificationNotePrefixes = ["Verification target ", "pong from ", "Peer is offline in current Tailscale status.", "No Tailscale target available for verification."];
+const verificationNotePrefixes = [
+  "Verification target ",
+  "Route quality ",
+  "pong from ",
+  "Command failed: tailscale ping ",
+  "Peer is offline in current Tailscale status.",
+  "No Tailscale target available for verification."
+];
 
 type VerificationResult = {
   nodeId: string;
@@ -14,7 +21,20 @@ type VerificationResult = {
   online: boolean;
   verified: boolean;
   detail: string;
+  routeQuality?: "direct" | "relay";
 };
+
+function inferRouteQuality(detail: string): "direct" | "relay" | undefined {
+  if (/via DERP\(/i.test(detail)) {
+    return "relay";
+  }
+
+  if (/via\s+\d{1,3}(?:\.\d{1,3}){3}:/i.test(detail) || /direct connection established/i.test(detail)) {
+    return "direct";
+  }
+
+  return undefined;
+}
 
 function verifyPeer(peer: TailscalePeer): VerificationResult {
   const nodeId = normalizeNodeId(peer.HostName);
@@ -37,7 +57,8 @@ function verifyPeer(peer: TailscalePeer): VerificationResult {
       target,
       online: true,
       verified: true,
-      detail: output
+      detail: output,
+      routeQuality: inferRouteQuality(output)
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -65,11 +86,14 @@ for (const result of results) {
   const notes = Array.from(
     new Set([
       ...existingLink.notes.filter(
-        (note) => !verificationNotePrefixes.some((prefix) => note.startsWith(prefix))
+        (note) =>
+          !verificationNotePrefixes.some((prefix) => note.startsWith(prefix)) &&
+          !note.includes("Command failed: tailscale ping")
       ),
       `Verification target ${result.target}`,
+      result.routeQuality ? `Route quality ${result.routeQuality}` : undefined,
       result.detail
-    ])
+    ].filter((note): note is string => Boolean(note)))
   );
 
   store.upsertLink({
@@ -87,5 +111,6 @@ for (const result of results) {
 
 for (const result of results) {
   const prefix = result.verified ? "[verified]" : result.online ? "[not verified]" : "[offline]";
-  console.log(`${prefix} ${result.nodeId}: ${result.detail}`);
+  const route = result.routeQuality ? ` (${result.routeQuality})` : "";
+  console.log(`${prefix}${route} ${result.nodeId}: ${result.detail}`);
 }

@@ -178,7 +178,7 @@ The hub now tracks connection paths separately from nodes:
 
 This is the first practical step toward real cross-system execution because it gives connection work its own place in the model.
 
-For live Tailscale members, `npm run verify:tailscale` can now promote a path from `reachable` to `verified` when a one-shot Tailscale ping succeeds.
+For live Tailscale members, `npm run verify:tailscale` can now promote a path from `reachable` to `verified` when a one-shot Tailscale ping succeeds. It also records route quality in link notes so you can tell whether a verified path is direct or relay-backed through DERP.
 
 For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability. It can use either a key-based path or a one-off password-backed check when that is the only working login method.
 
