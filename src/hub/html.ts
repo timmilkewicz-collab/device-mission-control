@@ -21,6 +21,23 @@ function escapeHtml(value: string): string {
     .replaceAll('"', "&quot;");
 }
 
+function extractRouteQuality(notes: string[]): string | undefined {
+  const note = notes.find((entry) => entry.startsWith("Route quality "));
+  return note ? note.slice("Route quality ".length) : undefined;
+}
+
+function renderStatusBadge(label: string, tone: "good" | "warn" | "muted"): string {
+  const styles = {
+    good: "background:#14532d;color:#dcfce7;border:1px solid #166534;",
+    warn: "background:#78350f;color:#fef3c7;border:1px solid #b45309;",
+    muted: "background:#1e293b;color:#cbd5e1;border:1px solid #475569;"
+  };
+
+  return `<span style="display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;${styles[tone]}">${escapeHtml(
+    label
+  )}</span>`;
+}
+
 export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options: DashboardOptions): string {
   const nodes = Object.values(state.nodes).sort((left, right) => left.label.localeCompare(right.label));
   const links = Object.values(state.links).sort((left, right) => left.label.localeCompare(right.label));
@@ -62,6 +79,15 @@ export function renderDashboard(state: HubState, snapshot: PlanSnapshot, options
   <body>
     <h1>Device Mission Control</h1>
     <p>Observer-first dashboard for notes, plans, and approval-gated tasks.</p>
+
+    <section>
+      <h2>Access</h2>
+      <ul>
+        <li>Local dashboard: <code>http://127.0.0.1:8787/</code></li>
+        <li>Tailnet dashboard: <code>http://dhd-admin.tail833d79.ts.net:8787/</code></li>
+        <li>Discovery manifest: <code>http://dhd-admin.tail833d79.ts.net:8787/.well-known/mission-control.json</code></li>
+      </ul>
+    </section>
 
     <section>
       <h2>Live Summary</h2>
@@ -399,11 +425,21 @@ function renderNodeCard(node: HubState["nodes"][string]): string {
 function renderLinkCard(link: HubState["links"][string], nodes: HubState["nodes"]): string {
   const sourceLabel = nodes[link.sourceNodeId]?.label ?? link.sourceNodeId;
   const targetLabel = nodes[link.targetNodeId]?.label ?? link.targetNodeId;
+  const routeQuality = extractRouteQuality(link.notes);
+  const routeBadge =
+    link.transport === "tailscale"
+      ? routeQuality === "direct"
+        ? renderStatusBadge("direct", "good")
+        : routeQuality === "relay"
+          ? renderStatusBadge("relay", "warn")
+          : renderStatusBadge("route unknown", "muted")
+      : "";
 
   return `<div class="task-card">
     <div><strong>${escapeHtml(link.label)}</strong> <span class="muted">(${escapeHtml(link.transport)} / ${escapeHtml(link.status)})</span></div>
     <div class="task-meta"><code>${escapeHtml(link.linkId)}</code></div>
     <div class="task-meta">${escapeHtml(sourceLabel)} -> ${escapeHtml(targetLabel)}</div>
+    ${routeBadge ? `<div class="task-meta">Route: ${routeBadge}</div>` : ""}
     ${link.lastCheckedAt ? `<div class="task-meta">Last checked: ${escapeHtml(link.lastCheckedAt)}</div>` : ""}
     ${link.notes.length > 0 ? `<ul>${link.notes.map((note) => `<li>${escapeHtml(note)}</li>`).join("")}</ul>` : ""}
   </div>`;

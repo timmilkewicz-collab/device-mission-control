@@ -96,6 +96,13 @@ function collectAttention(state: HubState, devices: DeviceRecord[]): string[] {
     attention.push(`Link ${link.label} is ${link.status} and may block cross-system work.`);
   }
 
+  const relayLinks = Object.values(state.links).filter(
+    (link) => link.transport === "tailscale" && link.notes.some((note) => note === "Route quality relay")
+  );
+  for (const link of relayLinks) {
+    attention.push(`Link ${link.label} is working through relay routing, so latency may be higher than a direct tailnet path.`);
+  }
+
   return attention;
 }
 
@@ -122,6 +129,13 @@ function collectSuggestedActions(state: HubState, devices: DeviceRecord[]): stri
     actions.push("Leave desktop control disabled until the observer-first workflow has enough history and successful tasks.");
   } else {
     actions.push("A narrowly scoped desktop pilot can be trialed on one device with session recording enabled.");
+  }
+
+  const relayLinks = Object.values(state.links).filter(
+    (link) => link.transport === "tailscale" && link.notes.some((note) => note === "Route quality relay")
+  );
+  if (relayLinks.length > 0) {
+    actions.push("Keep verified Tailscale links available, but treat direct-path tuning as a latency optimization rather than a connectivity emergency.");
   }
 
   return Array.from(new Set(actions));
