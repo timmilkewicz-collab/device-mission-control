@@ -60,6 +60,12 @@ Pull a real observation from the ProLiant over SSH and store it in the hub:
 MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> MISSION_CONTROL_PROLIANT_SSH_PASSWORD=<password> npm run collect:proliant
 ```
 
+Import a services inventory from a manifest file into the node registry:
+
+```bash
+npm run import:services-manifest
+```
+
 Start the Windows agent:
 
 ```bash
@@ -88,6 +94,7 @@ Optional environment variables:
 - `MISSION_CONTROL_PROLIANT_SSH_PASSWORD`: optional one-off password-backed verification path for `npm run verify:proliant-ssh`
 - `MISSION_CONTROL_PROLIANT_DEVICE_ID`: optional device id for remote ProLiant observations, default `proliant-ubuntu`
 - `MISSION_CONTROL_PROLIANT_DISPLAY_NAME`: optional display name for remote ProLiant observations
+- `MISSION_CONTROL_SERVICES_MANIFEST_PATH`: optional override for the services manifest import path
 
 ## Main endpoints
 
@@ -142,8 +149,9 @@ For Tailscale-connected machines, a practical local workflow is:
 3. `npm run verify:tailscale`
 4. `MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> npm run verify:proliant-ssh`
 5. `MISSION_CONTROL_PROLIANT_SSH_USER=<linux-user> MISSION_CONTROL_PROLIANT_SSH_PASSWORD=<password> npm run collect:proliant`
-6. start the hub
-7. let outside agents discover it via `/.well-known/mission-control.json`
+6. `npm run import:services-manifest`
+7. start the hub
+8. let outside agents discover it via `/.well-known/mission-control.json`
 
 ## Dashboard workflow
 
@@ -183,6 +191,8 @@ For live Tailscale members, `npm run verify:tailscale` can now promote a path fr
 For the ProLiant server, `npm run verify:proliant-ssh` promotes the SSH link once a real login path succeeds, and otherwise records whether the remaining blocker is auth or reachability. It can use either a key-based path or a one-off password-backed check when that is the only working login method.
 
 `npm run collect:proliant` is the first real cross-node run in the repo: it logs into the verified ProLiant SSH path, registers the server as a Linux device if needed, and stores a live observation with services, top processes, containers, and uptime in the hub state.
+
+`npm run import:services-manifest` turns a discovery inventory like `services.manifest` into registry nodes so those services can show up in the hub as real discovered endpoints instead of a disconnected reference file.
 
 ## Peer inbox
 

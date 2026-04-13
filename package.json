@@ -12,6 +12,7 @@
     "verify:tailscale": "tsx src/hub/verifyTailscale.ts",
     "verify:proliant-ssh": "tsx src/hub/verifyProliantSsh.ts",
     "collect:proliant": "tsx src/hub/collectProliantObservation.ts",
+    "import:services-manifest": "tsx src/hub/importServicesManifest.ts",
     "agent:windows": "tsx src/agent/windows.ts",
     "agent:linux": "tsx src/agent/linux.ts",
     "test": "node --test --import tsx"
