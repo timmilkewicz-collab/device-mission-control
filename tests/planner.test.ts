@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "../src/hub/planner";
+import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "../src/hub/operationalPlanner";
 import { HubState } from "../src/shared/types";
 
 function buildState(): HubState {

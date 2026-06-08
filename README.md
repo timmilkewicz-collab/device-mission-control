@@ -2,6 +2,30 @@
 
 Observer-first mission control for a Windows workstation, a Linux/home-server agent, and a central hub.
 
+## Repo boundaries
+
+- `README.md`, `package.json`, `tsconfig.json`, and env examples stay at repo root
+- `AGENTS.md` defines the shared AI agent operating contract
+- runtime code lives under `src/`
+- tests live under `tests/`
+- active AI memory, handoffs, decision records, and runbooks live under `docs/ai/`
+- active operator docs live under `docs/base44/`
+- historical or research-only material lives under `docs/archive/`
+- local state and snapshots live under `.mission-control/` and stay ignored
+- local binary dumps and one-off recovery files live under `.local-artifacts/` and stay ignored
+
+## Active docs
+
+- [docs/README.md](docs/README.md): docs map and archive policy
+- [AGENTS.md](AGENTS.md): shared Planner, Builder, QA, and Librarian operating contract
+- [docs/ai/README.md](docs/ai/README.md): portable AI memory structure
+- [docs/ai/current-state.md](docs/ai/current-state.md): short current operational truth
+- [docs/ai/project-context.md](docs/ai/project-context.md): stable architecture, goals, and constraints
+- [docs/base44/README.md](docs/base44/README.md): current Base44 operator docs
+- [docs/base44/hoqs-lab.md](docs/base44/hoqs-lab.md): HOQS lab Base44 setup
+- [docs/base44/tim-app.md](docs/base44/tim-app.md): Tim/Seth Base44 setup
+- [docs/base44/canonical-app.md](docs/base44/canonical-app.md): Canonical Base44 setup
+
 ## What is implemented
 
 - `hub`: HTTP dashboard and API for nodes, links, devices, observations, plan snapshots, task requests, approvals, and council sessions
@@ -66,6 +90,18 @@ Import a services inventory from a manifest file into the node registry:
 npm run import:services-manifest
 ```
 
+Check the AI operating-memory structure:
+
+```bash
+npm run ai:check
+```
+
+Check whether the local Mission Control token is present without printing it:
+
+```bash
+npm run token:status
+```
+
 Start the Windows agent:
 
 ```bash
@@ -81,6 +117,8 @@ npm run agent:linux
 Optional environment variables:
 
 - `MISSION_CONTROL_PORT`: hub port, default `8787`
+- `MISSION_CONTROL_HOST`: bind host, default `127.0.0.1`
+- `MISSION_CONTROL_ENV_FILE`: optional env file loaded before `.env.local` and `.env`
 - `MISSION_CONTROL_HUB_URL`: agent target, default `http://localhost:8787`
 - `MISSION_CONTROL_TOKEN`: shared bearer token for protected POST routes
 - `MISSION_CONTROL_DEVICE_ID`: per-agent device id
@@ -107,7 +145,18 @@ Optional environment variables:
 - `GET /api/state`: raw state plus latest plan snapshot
 - `GET /api/approvals`: pending task approvals
 - `GET /api/council/sessions`: current and recent council sessions
+- `GET /api/council/sessions/:id`: one council session by id (for tailnet agents polling a single thread)
 - `GET /api/desktop-control/evaluation`: readiness gate output
+- `GET /api/ai/overview`: read-only AI role loop, current memory summary, and latest durable records
+- `GET /api/ai/records?kind=decision|handoff|runbook`: read-only AI memory records by kind
+- `GET /api/base44/snapshots`: latest Base44 inventory and peek summaries discovered from `.mission-control/data`
+- `GET /api/base44/integrity-alerts`: flattened integrity review queue from the latest `IntegrityAlert` peeks
+- `GET /api/base44/evidence-packages`: flattened evidence package queue from the latest unfiltered `EvidencePackage` peeks
+- `POST /api/base44/refresh-inventory`: refresh Base44 inventory for a known app using local env-backed credentials
+- `POST /api/base44/refresh-peek`: refresh one Base44 entity peek for a known app using local env-backed credentials
+- `POST /api/base44/integrity-alerts/acknowledge`: locally mark an integrity alert as acknowledged in mission control
+- `POST /api/base44/integrity-alerts/open-council`: open a council thread from an integrity alert
+- `POST /api/base44/integrity-alerts/evidence-check`: run an `EvidencePackage` peek for the alert id
 - `POST /api/devices/register`: register or refresh a device
 - `POST /api/nodes`: create or update a node registry entry
 - `POST /api/links`: create or update a connection link
@@ -155,14 +204,20 @@ For Tailscale-connected machines, a practical local workflow is:
 
 ## Dashboard workflow
 
-When `MISSION_CONTROL_TOKEN` is not set, the dashboard can drive the observer-first loop directly:
+By default the hub binds to `127.0.0.1`. When `MISSION_CONTROL_TOKEN` is not set, the dashboard can drive the observer-first loop directly only from that loopback-bound local hub:
 
 - request named tasks from each registered device
 - approve or reject pending task requests from the approval queue
 - review recent task outcomes alongside device summaries
 - open council sessions to gather input from multiple machines or external agents
 
-If `MISSION_CONTROL_TOKEN` is set, browser forms stay disabled by policy and task mutations should go through the JSON API with a bearer token.
+If `MISSION_CONTROL_TOKEN` is set, browser forms stay disabled by policy and task mutations should go through the JSON API with a bearer token. Agents load `.env.local` automatically and send that token when registering, reporting observations, polling approved tasks, and posting task results.
+
+The hub refuses to start on a non-loopback host such as `0.0.0.0` unless `MISSION_CONTROL_TOKEN` is set. To expose Mission Control on a tailnet or LAN, set both values explicitly:
+
+```bash
+MISSION_CONTROL_HOST=0.0.0.0 MISSION_CONTROL_TOKEN=<strong-token> npm run dev:hub
+```
 
 ## Node registry
 
@@ -211,6 +266,30 @@ curl -X POST "http://dhd-admin.tail833d79.ts.net:8787/v1/inbox" \
   -d "{\"role\":\"cursor\",\"text\":\"Remote bridge is up on the Dell 2-in-1.\"}"
 ```
 
+## Base44 snapshots
+
+The hub can now surface the latest Base44 snapshots already collected by the repo tools:
+
+- `npm run base44:inventory`
+- `npm run base44:peek -- <EntityName>`
+- `GET /api/base44/snapshots`
+- `GET /api/base44/integrity-alerts`
+- `GET /api/base44/evidence-packages`
+- dashboard `Base44 Control Surface` section
+- dashboard `Integrity Review Queue` section
+- dashboard `Evidence Package Queue` section
+
+Each integrity alert card can now:
+
+- acknowledge locally
+- open a council session
+- trigger an `EvidencePackage` check
+- refresh the latest `IntegrityAlert` peek
+
+Those commands write safe summary JSON files into `.mission-control/data`, and the hub reads the latest inventory plus latest peek per entity for each Base44 app it finds there.
+
+If `.env.local` already has a working Base44 API key, the dashboard can now refresh inventory and peeks for a discovered Base44 app by reusing that key while overriding the app id and API base from the snapshot card.
+
 ## Council bridge
 
 The hub can now act as a lightweight bridge for a small council of agents:
@@ -220,6 +299,67 @@ The hub can now act as a lightweight bridge for a small council of agents:
 - keep the council thread visible in the same place as device status and task approvals
 
 This is intentionally simple: it gives you one coordination surface for Tailscale-connected machines, Cursor, and other agents without pretending they all run inside the same runtime.
+
+### Council quickstart (from another machine on the tailnet)
+
+Replace the base URL with your hub (see `GET /.well-known/mission-control.json`). When `MISSION_CONTROL_TOKEN` is set, add `Authorization: Bearer <token>` to **POST** requests below.
+
+**1. Open a session**
+
+```bash
+curl -sS -X POST "http://localhost:8787/api/council/sessions" \
+  -H "content-type: application/json" \
+  -d "{\"topic\":\"Evening plan\",\"prompt\":\"What is one small step we should take next?\",\"requestedBy\":\"cursor-buddy\",\"targetMemberIds\":[\"dell-2in1\",\"proliant-ubuntu\"]}"
+```
+
+**2. Note the `id` in the JSON**, then add a structured response (`stance` is one of `support`, `concern`, `block`, `inform`):
+
+```bash
+curl -sS -X POST "http://localhost:8787/api/council/sessions/<sessionId>/responses" \
+  -H "content-type: application/json" \
+  -d "{\"memberId\":\"dell-2in1\",\"memberLabel\":\"Dell 2-in-1\",\"stance\":\"support\",\"summary\":\"Sync Tailscale, then one hub smoke test.\",\"detail\":\"Keeps the council thread honest without touching production tasks.\"}"
+```
+
+**3. Poll the live thread**
+
+```bash
+curl -sS "http://localhost:8787/api/council/sessions/<sessionId>"
+```
+
+**PowerShell (same flow)**
+
+```powershell
+$base = "http://localhost:8787"
+$headers = @{ "content-type" = "application/json" }
+# $headers["Authorization"] = "Bearer $env:MISSION_CONTROL_TOKEN"
+
+$session = Invoke-RestMethod -Method POST -Uri "$base/api/council/sessions" -Headers $headers -Body (@{
+  topic = "Evening plan"
+  prompt = "What is one small step we should take next?"
+  requestedBy = "powershell-friend"
+  targetMemberIds = @("dell-2in1")
+} | ConvertTo-Json)
+
+$id = $session.id
+Invoke-RestMethod -Method POST -Uri "$base/api/council/sessions/$id/responses" -Headers $headers -Body (@{
+  memberId = "dell-2in1"
+  memberLabel = "Dell 2-in-1"
+  stance = "inform"
+  summary = "Hub is up; council endpoint responds."
+} | ConvertTo-Json)
+
+Invoke-RestMethod -Method GET -Uri "$base/api/council/sessions/$id"
+```
+
+**4. One-command smoke test (hub must be running)**
+
+```bash
+npm run dev:hub
+# other terminal:
+npm run council:demo
+```
+
+Uses `MISSION_CONTROL_HUB_URL` (default `http://localhost:8787`) and optional `MISSION_CONTROL_TOKEN` for POSTs.
 
 ## Approval-gated task model
 

@@ -141,3 +141,19 @@ test("store can upsert connection links between nodes", () => {
   assert.equal(store.getLinks().length, 1);
   assert.equal(store.getLinks()[0]?.transport, "ssh");
 });
+
+test("store resolves a single council session by id", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mission-control-"));
+  const store = new MissionControlStore(path.join(tempDir, "state.json"));
+
+  const session = store.createCouncilSession({
+    topic: "Council smoke",
+    prompt: "Are we having fun yet?",
+    requestedBy: "test-runner",
+    targetMemberIds: ["node-a"]
+  });
+
+  assert.equal(store.getCouncilSession(session.id)?.id, session.id);
+  assert.equal(store.getCouncilSession(session.id)?.responses.length, 0);
+  assert.equal(store.getCouncilSession("council-missing"), undefined);
+});

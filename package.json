@@ -5,6 +5,12 @@
   "description": "Observer-first mission control hub with Windows and Linux agents.",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "base44:inventory": "tsx src/tools/base44Inventory.ts",
+    "base44:peek": "tsx src/tools/base44Peek.ts",
+    "base44:status": "tsx src/tools/base44Status.ts",
+    "base44:users": "tsx src/tools/base44Users.ts",
+    "ai:check": "tsx src/tools/aiCheck.ts",
+    "token:status": "tsx src/tools/missionControlTokenStatus.ts",
     "check": "tsc -p tsconfig.json --noEmit",
     "dev:hub": "tsx src/hub/index.ts",
     "seed:known-network": "tsx src/hub/bootstrapKnownNetwork.ts",
@@ -13,6 +19,7 @@
     "verify:proliant-ssh": "tsx src/hub/verifyProliantSsh.ts",
     "collect:proliant": "tsx src/hub/collectProliantObservation.ts",
     "import:services-manifest": "tsx src/hub/importServicesManifest.ts",
+    "council:demo": "tsx src/hub/councilDemo.ts",
     "agent:windows": "tsx src/agent/windows.ts",
     "agent:linux": "tsx src/agent/linux.ts",
     "test": "node --test --import tsx"

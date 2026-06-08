@@ -6,15 +6,20 @@ import { baseTaskCatalog } from "../agent/tasks";
 
 const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 
-const host = process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
-const user = process.env.MISSION_CONTROL_PROLIANT_SSH_USER ?? "macro";
-const password = process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
-const port = process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
-const deviceId = process.env.MISSION_CONTROL_PROLIANT_DEVICE_ID ?? "proliant-ubuntu";
-const displayName = process.env.MISSION_CONTROL_PROLIANT_DISPLAY_NAME ?? "ProLiant Ubuntu Server";
+const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
+const user = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_USER ?? process.env.MISSION_CONTROL_PROLIANT_SSH_USER ?? "macro";
+const password = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PASSWORD ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
+const port = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PORT ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
+const deviceId = process.env.MISSION_CONTROL_REMOTE_LINUX_DEVICE_ID ?? process.env.MISSION_CONTROL_PROLIANT_DEVICE_ID ?? "proliant-ubuntu";
+const displayName =
+  process.env.MISSION_CONTROL_REMOTE_LINUX_DISPLAY_NAME ??
+  process.env.MISSION_CONTROL_PROLIANT_DISPLAY_NAME ??
+  "Unverified Linux Host (goliathsystem)";
 
 if (!password) {
-  throw new Error("MISSION_CONTROL_PROLIANT_SSH_PASSWORD is required for collect:proliant.");
+  throw new Error(
+    "MISSION_CONTROL_REMOTE_LINUX_SSH_PASSWORD or MISSION_CONTROL_PROLIANT_SSH_PASSWORD is required for collect:proliant."
+  );
 }
 
 type RemoteSnapshot = {
@@ -143,7 +148,7 @@ const registration: DeviceRegistration = {
   displayName,
   hostName: snapshot.hostName,
   platform: "linux",
-  tags: ["linux", "server", "remote", "ssh", "proliant"],
+  tags: ["linux", "remote", "ssh", "identity-unverified"],
   capabilities: ["workspace", "services", "processes", "containers", "tasks", "logs"],
   permissions: {
     observe: true,

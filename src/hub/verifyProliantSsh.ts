@@ -4,11 +4,11 @@ import { MissionControlStore } from "./store";
 
 const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const linkId = "dhd-admin-to-proliant-ssh";
-const host = process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
-const user = process.env.MISSION_CONTROL_PROLIANT_SSH_USER;
-const keyPath = process.env.MISSION_CONTROL_PROLIANT_SSH_KEY_PATH;
-const password = process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
-const port = process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
+const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
+const user = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_USER ?? process.env.MISSION_CONTROL_PROLIANT_SSH_USER;
+const keyPath = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_KEY_PATH ?? process.env.MISSION_CONTROL_PROLIANT_SSH_KEY_PATH;
+const password = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PASSWORD ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
+const port = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PORT ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
 const checkedAt = new Date().toISOString();
 const successMarker = "mission-control-ssh-ok";
 
@@ -36,13 +36,14 @@ if (!user) {
     status: "blocked",
     notes: [
       ...baseNotes,
-      `SSH host ${host}:${port} is reachable and trusted from this machine.`,
-      "SSH auth is still blocked: set MISSION_CONTROL_PROLIANT_SSH_USER to verify a real login path."
+      `SSH verification target is ${host}:${port}.`,
+      "SSH auth is still blocked: set MISSION_CONTROL_REMOTE_LINUX_SSH_USER or MISSION_CONTROL_PROLIANT_SSH_USER to verify a real login path.",
+      "Hardware identity remains unconfirmed until the remote hostname and expected machine role are checked."
     ],
     lastCheckedAt: checkedAt,
     lastSucceededAt: link.lastSucceededAt
   });
-  console.log("SSH verification blocked: set MISSION_CONTROL_PROLIANT_SSH_USER and rerun.");
+  console.log("SSH verification blocked: set MISSION_CONTROL_REMOTE_LINUX_SSH_USER or MISSION_CONTROL_PROLIANT_SSH_USER and rerun.");
   process.exit(0);
 }
 
@@ -112,9 +113,10 @@ try {
     status: verified ? "verified" : "blocked",
     notes: [
       ...baseNotes,
-      `SSH host ${host}:${port} is reachable and trusted from this machine.`,
+      `SSH command verified against ${host}:${port}.`,
       `SSH auth succeeded for ${user}${password ? " using password-backed verification." : "."}`,
-      `SSH command output: ${output || "(empty output)"}`
+      `SSH command output: ${output || "(empty output)"}`,
+      "Hardware identity still needs explicit human confirmation before labeling this host as the server."
     ],
     lastCheckedAt: checkedAt,
     lastSucceededAt: verified ? checkedAt : link.lastSucceededAt
@@ -137,7 +139,7 @@ try {
     status: isOffline ? "offline" : isAuthError ? "blocked" : "attempting",
     notes: [
       ...baseNotes,
-      `SSH host ${host}:${port} is reachable and trusted from this machine.`,
+      `SSH verification target is ${host}:${port}.`,
       isAuthError ? `SSH auth failed for ${user}.` : "SSH verification did not complete.",
       `SSH verification error: ${stderr}`
     ],

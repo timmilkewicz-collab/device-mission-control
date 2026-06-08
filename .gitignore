@@ -1,4 +1,8 @@
 node_modules
 dist
 .mission-control
+.local-artifacts
 *.log
+.env
+.env.local
+.env.*.local

@@ -20,7 +20,7 @@ import {
   hubStateSchema,
   nowIso
 } from "../shared/types";
-import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "./planner";
+import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "./operationalPlanner";
 
 export class MissionControlStore {
   private state: HubState;
@@ -312,6 +312,10 @@ export class MissionControlStore {
 
   getCouncilSessions(): CouncilSession[] {
     return [...this.state.councilSessions].reverse();
+  }
+
+  getCouncilSession(sessionId: string): CouncilSession | undefined {
+    return this.state.councilSessions.find((entry) => entry.id === sessionId);
   }
 
   getNodes(): NodeRecord[] {

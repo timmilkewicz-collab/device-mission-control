@@ -1,6 +1,9 @@
 import http from "node:http";
 import { URL } from "node:url";
 import { badRequest, notFound, readFormBody, readJsonBody, redirect, sendHtml, sendJson, unauthorized } from "../shared/http";
+import { getAiMemoryOverview, listAiMemoryRecordsByQuery } from "./aiMemory";
+import { refreshBase44Inventory, refreshBase44Peek } from "./base44Refresh";
+import { IntegrityReviewStore } from "./integrityReviewStore";
 import {
   councilResponseInputSchema,
   councilSessionInputSchema,
@@ -14,15 +17,38 @@ import {
   taskResultInputSchema
 } from "../shared/types";
 import { PeerInboxStore } from "./inbox";
+import {
+  linkEvidencePackagesToIntegrityAlerts,
+  listBase44AppsFromSnapshots,
+  listBase44EvidencePackages,
+  listBase44IntegrityAlerts
+} from "./base44Snapshots";
 import { renderDashboard } from "./html";
 import { MissionControlStore } from "./store";
 
 type HubServerOptions = {
   port: number;
+  host?: string;
   store: MissionControlStore;
   inbox: PeerInboxStore;
+  integrityReviews: IntegrityReviewStore;
   sharedToken?: string;
 };
+
+export function isLoopbackHost(host: string): boolean {
+  const normalized = host.trim().toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+export function assertSafeHubExposure(host: string, sharedToken: string | undefined): void {
+  if (sharedToken || isLoopbackHost(host)) {
+    return;
+  }
+
+  throw new Error(
+    `Refusing to start Mission Control on ${host} without MISSION_CONTROL_TOKEN. Set MISSION_CONTROL_TOKEN or bind to 127.0.0.1.`
+  );
+}
 
 function assertAuthorized(token: string | undefined, authHeader: string | undefined): boolean {
   if (!token) {
@@ -32,19 +58,37 @@ function assertAuthorized(token: string | undefined, authHeader: string | undefi
   return authHeader === `Bearer ${token}`;
 }
 
+function requireAuthorized(
+  response: http.ServerResponse,
+  token: string | undefined,
+  authHeader: string | undefined
+): boolean {
+  if (assertAuthorized(token, authHeader)) {
+    return true;
+  }
+
+  unauthorized(response);
+  return false;
+}
+
 function buildDiscoveryManifest(options: HubServerOptions, requestUrl: URL) {
   const origin = requestUrl.origin;
+  const bindHost = options.host ?? "127.0.0.1";
   return {
     name: "device-mission-control",
     description: "Observer-first coordination hub for machines, links, devices, agents, and council sessions.",
+    network: {
+      bindHost,
+      writeExposure: options.sharedToken ? "token-protected" : "loopback-only"
+    },
     auth: options.sharedToken
       ? {
           mode: "bearer",
-          note: "Write operations require Authorization: Bearer <MISSION_CONTROL_TOKEN>."
+          note: "Write operations and agent task polling require Authorization: Bearer <MISSION_CONTROL_TOKEN>."
         }
       : {
           mode: "open-local",
-          note: "Browser actions and JSON writes are enabled because MISSION_CONTROL_TOKEN is not configured."
+          note: "Browser actions and JSON writes are enabled only on the loopback-bound local hub because MISSION_CONTROL_TOKEN is not configured."
         },
     discovery: {
       self: `${origin}/.well-known/mission-control.json`,
@@ -76,12 +120,25 @@ function buildDiscoveryManifest(options: HubServerOptions, requestUrl: URL) {
       },
       council: {
         list: `${origin}/api/council/sessions`,
+        get: `${origin}/api/council/sessions/<sessionId>`,
         create: `${origin}/api/council/sessions`,
         respond: `${origin}/api/council/sessions/<sessionId>/responses`,
         close: `${origin}/api/council/sessions/<sessionId>/close`
       },
       evaluation: {
         desktopControl: `${origin}/api/desktop-control/evaluation`
+      },
+      integrations: {
+        aiMemoryOverview: `${origin}/api/ai/overview`,
+        aiMemoryRecords: `${origin}/api/ai/records?kind=decision|handoff|runbook`,
+        base44Snapshots: `${origin}/api/base44/snapshots`,
+        base44IntegrityAlerts: `${origin}/api/base44/integrity-alerts`,
+        base44EvidencePackages: `${origin}/api/base44/evidence-packages`,
+        refreshInventory: `${origin}/api/base44/refresh-inventory`,
+        refreshPeek: `${origin}/api/base44/refresh-peek`,
+        acknowledgeIntegrityAlert: `${origin}/api/base44/integrity-alerts/acknowledge`,
+        openIntegrityCouncil: `${origin}/api/base44/integrity-alerts/open-council`,
+        runEvidenceCheck: `${origin}/api/base44/integrity-alerts/evidence-check`
       }
     },
     suggestedBootOrder: [
@@ -94,17 +151,45 @@ function buildDiscoveryManifest(options: HubServerOptions, requestUrl: URL) {
 }
 
 export function createHubServer(options: HubServerOptions) {
+  const host = options.host ?? "127.0.0.1";
+  assertSafeHubExposure(host, options.sharedToken);
+
   const server = http.createServer(async (request, response) => {
     const method = request.method ?? "GET";
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
 
     try {
+      const base44Apps = listBase44AppsFromSnapshots();
+      const base44EvidencePackages = listBase44EvidencePackages(base44Apps);
+      const aiMemoryOverview = getAiMemoryOverview();
+      const base44IntegrityAlerts = linkEvidencePackagesToIntegrityAlerts(
+        listBase44IntegrityAlerts(base44Apps),
+        base44EvidencePackages
+      ).map((alert) => {
+        if (!alert.id) {
+          return alert;
+        }
+
+        const review = options.integrityReviews.get(alert.appId, alert.id);
+        return review
+          ? {
+              ...alert,
+              acknowledgedAt: review.acknowledgedAt,
+              acknowledgedBy: review.actor
+            }
+          : alert;
+      });
+
       if (method === "GET" && url.pathname === "/") {
         return sendHtml(
           response,
           renderDashboard(options.store.getState(), options.store.getLatestPlan(), {
             inboxMessages: options.inbox.list(50),
-            interactive: !options.sharedToken
+            interactive: !options.sharedToken,
+            base44Apps,
+            base44IntegrityAlerts,
+            base44EvidencePackages,
+            aiMemoryOverview
           })
         );
       }
@@ -147,11 +232,48 @@ export function createHubServer(options: HubServerOptions) {
         return sendJson(response, 200, options.store.getState().desktopControlEvaluation);
       }
 
+      if (method === "GET" && url.pathname === "/api/ai/overview") {
+        return sendJson(response, 200, aiMemoryOverview);
+      }
+
+      if (method === "GET" && url.pathname === "/api/ai/records") {
+        return sendJson(response, 200, {
+          records: listAiMemoryRecordsByQuery(url.searchParams.get("kind") ?? undefined)
+        });
+      }
+
+      if (method === "GET" && url.pathname === "/api/base44/snapshots") {
+        return sendJson(response, 200, base44Apps);
+      }
+
+      if (method === "GET" && url.pathname === "/api/base44/integrity-alerts") {
+        return sendJson(response, 200, base44IntegrityAlerts);
+      }
+
+      if (method === "GET" && url.pathname === "/api/base44/evidence-packages") {
+        return sendJson(response, 200, base44EvidencePackages);
+      }
+
+      if (method === "GET" && /^\/api\/council\/sessions\/[^/]+$/.test(url.pathname)) {
+        const councilSessionId = url.pathname.split("/")[4];
+        if (!councilSessionId) {
+          throw new Error("Council session id is required.");
+        }
+        const session = options.store.getCouncilSession(councilSessionId);
+        if (!session) {
+          return notFound(response);
+        }
+        return sendJson(response, 200, session);
+      }
+
       if (method === "GET" && url.pathname === "/api/council/sessions") {
         return sendJson(response, 200, options.store.getCouncilSessions());
       }
 
       if (method === "GET" && url.pathname === "/api/task-requests") {
+        if (!requireAuthorized(response, options.sharedToken, request.headers.authorization)) {
+          return;
+        }
         const deviceId = url.searchParams.get("deviceId");
         if (!deviceId) {
           throw new Error("deviceId query parameter is required.");
@@ -269,6 +391,77 @@ export function createHubServer(options: HubServerOptions) {
         return redirect(response, "/");
       }
 
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/base44/inventory-refresh") {
+        const form = await readFormBody(request);
+        refreshBase44Inventory(process.cwd(), {
+          appId: form.appId ?? "",
+          apiBase: form.apiBase ?? "",
+          limit: form.limit ? Number(form.limit) : undefined,
+          sortBy: form.sortBy || undefined
+        });
+        return redirect(response, "/");
+      }
+
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/base44/peek-refresh") {
+        const form = await readFormBody(request);
+        refreshBase44Peek(process.cwd(), {
+          appId: form.appId ?? "",
+          apiBase: form.apiBase ?? "",
+          entity: form.entity ?? "",
+          limit: form.limit ? Number(form.limit) : undefined,
+          sortBy: form.sortBy || undefined,
+          query: form.query ? JSON.parse(form.query) : undefined,
+          requestedFields: form.fields
+            ? form.fields
+                .split(",")
+                .map((value) => value.trim())
+                .filter(Boolean)
+            : undefined
+        });
+        return redirect(response, "/");
+      }
+
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/base44/integrity-alerts/acknowledge") {
+        const form = await readFormBody(request);
+        options.integrityReviews.acknowledge({
+          appId: form.appId ?? "",
+          alertId: form.alertId ?? "",
+          actor: form.actor || "dashboard",
+          note: form.note || undefined,
+          alertType: form.alertType || undefined,
+          signalSummary: form.signalSummary || undefined
+        });
+        return redirect(response, "/");
+      }
+
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/base44/integrity-alerts/open-council") {
+        const form = await readFormBody(request);
+        const alertId = form.alertId ?? "";
+        const alertType = form.alertType ?? "IntegrityAlert";
+        const severity = form.severity ?? "unknown";
+        const status = form.status ?? "unknown";
+        const signalSummary = form.signalSummary ?? "No summary captured.";
+        options.store.createCouncilSession({
+          topic: `Integrity alert ${alertType}`,
+          prompt: `Review Base44 integrity alert ${alertId}.\nSeverity: ${severity}\nStatus: ${status}\nSummary: ${signalSummary}`,
+          requestedBy: "base44-integrity-queue",
+          targetMemberIds: ["windows-main", "linux-home-server"]
+        });
+        return redirect(response, "/");
+      }
+
+      if (!options.sharedToken && method === "POST" && url.pathname === "/actions/base44/integrity-alerts/evidence-check") {
+        const form = await readFormBody(request);
+        refreshBase44Peek(process.cwd(), {
+          appId: form.appId ?? "",
+          apiBase: form.apiBase ?? "",
+          entity: "EvidencePackage",
+          query: form.alertId ? { alert_id: form.alertId } : undefined,
+          requestedFields: ["package_id", "package_status", "alert_id", "retention_until", "confidential"]
+        });
+        return redirect(response, "/");
+      }
+
       if (!assertAuthorized(options.sharedToken, request.headers.authorization)) {
         return unauthorized(response);
       }
@@ -306,6 +499,89 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "POST" && url.pathname === "/api/council/sessions") {
         const input = councilSessionInputSchema.parse(await readJsonBody(request));
         return sendJson(response, 201, options.store.createCouncilSession(input));
+      }
+
+      if (method === "POST" && url.pathname === "/api/base44/refresh-inventory") {
+        const input = (await readJsonBody(request)) as Record<string, unknown>;
+        return sendJson(
+          response,
+          200,
+          refreshBase44Inventory(process.cwd(), {
+            appId: String(input.appId ?? ""),
+            apiBase: String(input.apiBase ?? ""),
+            limit: typeof input.limit === "number" ? input.limit : undefined,
+            sortBy: typeof input.sortBy === "string" ? input.sortBy : undefined
+          })
+        );
+      }
+
+      if (method === "POST" && url.pathname === "/api/base44/refresh-peek") {
+        const input = (await readJsonBody(request)) as Record<string, unknown>;
+        return sendJson(
+          response,
+          200,
+          refreshBase44Peek(process.cwd(), {
+            appId: String(input.appId ?? ""),
+            apiBase: String(input.apiBase ?? ""),
+            entity: String(input.entity ?? ""),
+            limit: typeof input.limit === "number" ? input.limit : undefined,
+            sortBy: typeof input.sortBy === "string" ? input.sortBy : undefined,
+            query:
+              input.query && typeof input.query === "object" && !Array.isArray(input.query)
+                ? (input.query as Record<string, unknown>)
+                : undefined,
+            requestedFields: Array.isArray(input.requestedFields)
+              ? input.requestedFields.filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+              : undefined
+          })
+        );
+      }
+
+      if (method === "POST" && url.pathname === "/api/base44/integrity-alerts/acknowledge") {
+        const input = (await readJsonBody(request)) as Record<string, unknown>;
+        return sendJson(
+          response,
+          200,
+          options.integrityReviews.acknowledge({
+            appId: String(input.appId ?? ""),
+            alertId: String(input.alertId ?? ""),
+            actor: String(input.actor ?? "api"),
+            note: typeof input.note === "string" ? input.note : undefined,
+            alertType: typeof input.alertType === "string" ? input.alertType : undefined,
+            signalSummary: typeof input.signalSummary === "string" ? input.signalSummary : undefined
+          })
+        );
+      }
+
+      if (method === "POST" && url.pathname === "/api/base44/integrity-alerts/open-council") {
+        const input = (await readJsonBody(request)) as Record<string, unknown>;
+        return sendJson(
+          response,
+          201,
+          options.store.createCouncilSession({
+            topic: `Integrity alert ${String(input.alertType ?? "IntegrityAlert")}`,
+            prompt: `Review Base44 integrity alert ${String(input.alertId ?? "")}.\nSeverity: ${String(
+              input.severity ?? "unknown"
+            )}\nStatus: ${String(input.status ?? "unknown")}\nSummary: ${String(input.signalSummary ?? "No summary captured.")}`,
+            requestedBy: "base44-integrity-queue",
+            targetMemberIds: ["windows-main", "linux-home-server"]
+          })
+        );
+      }
+
+      if (method === "POST" && url.pathname === "/api/base44/integrity-alerts/evidence-check") {
+        const input = (await readJsonBody(request)) as Record<string, unknown>;
+        return sendJson(
+          response,
+          200,
+          refreshBase44Peek(process.cwd(), {
+            appId: String(input.appId ?? ""),
+            apiBase: String(input.apiBase ?? ""),
+            entity: "EvidencePackage",
+            query: input.alertId ? { alert_id: String(input.alertId) } : undefined,
+            requestedFields: ["package_id", "package_status", "alert_id", "retention_until", "confidential"]
+          })
+        );
       }
 
       if (method === "POST" && /^\/api\/council\/sessions\/[^/]+\/responses$/.test(url.pathname)) {
@@ -353,7 +629,7 @@ export function createHubServer(options: HubServerOptions) {
     server,
     listen(): Promise<void> {
       return new Promise((resolve) => {
-        server.listen(options.port, resolve);
+        server.listen(options.port, host, resolve);
       });
     }
   };

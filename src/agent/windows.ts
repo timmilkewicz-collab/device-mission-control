@@ -6,7 +6,10 @@ import { promisify } from "node:util";
 import { AgentRuntime, openPathForPlatform } from "./runtime";
 import { baseTaskCatalog } from "./tasks";
 import { ProcessSnapshot, ScreenshotSnapshot, ServiceSnapshot, TaskRequest, nowIso } from "../shared/types";
+import { loadMissionControlEnv } from "../shared/env";
 import { resolveScreenshotDir } from "../shared/paths";
+
+loadMissionControlEnv();
 
 const execFileAsync = promisify(execFile);
 

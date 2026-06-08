@@ -112,22 +112,28 @@ function seedKnownNodes(): void {
 
   store.upsertNode({
     nodeId: "proliant-ubuntu",
-    label: "ProLiant Ubuntu Server",
-    kind: "server",
+    label: "Unverified Linux Host (goliathsystem)",
+    kind: "machine",
     platform: "ubuntu",
-    status: "partial",
+    status: "offline",
     linkedNodeIds: [],
     agentSurfaces: [],
     capabilities: ["ssh", "council", "logs"],
     reachability: {
       tailscale: false,
-      ssh: true,
+      ssh: false,
       localAgent: false,
       companion: false,
-      notes: ["eno1 identified as 192.168.0.174", "SSH TCP connection accepted during probe"]
+      notes: [
+        "Older probe identified 192.168.0.174 as goliathsystem",
+        "Hardware identity is not confirmed; user flagged this may be the oldest laptop, not the server"
+      ]
     },
-    tags: ["server", "ubuntu", "partial"],
-    notes: ["Server is on the network but not fully integrated into the hub yet."],
+    tags: ["ubuntu", "partial", "identity-unverified"],
+    notes: [
+      "Previously labeled ProLiant Ubuntu Server from an old SSH observation.",
+      "Do not treat this as the confirmed server until a fresh reachability and identity check succeeds."
+    ],
     lastSeenAt: now
   });
 }
@@ -184,9 +190,12 @@ function seedKnownLinks(): void {
     sourceNodeId: "dhd-admin",
     targetNodeId: "proliant-ubuntu",
     transport: "ssh",
-    status: "attempting",
-    label: "DHD-Admin to ProLiant Ubuntu over SSH",
-    notes: ["SSH TCP probe reached 192.168.0.174", "Still not proven as a full end-to-end management path"],
+    status: "offline",
+    label: "DHD-Admin to unverified goliathsystem host over SSH",
+    notes: [
+      "Older SSH probe reached 192.168.0.174",
+      "Current hardware identity is unconfirmed; do not label as server until re-verified"
+    ],
     lastCheckedAt: now
   });
 }

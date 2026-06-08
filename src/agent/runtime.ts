@@ -46,8 +46,10 @@ async function postJson(url: string, body: unknown, token?: string): Promise<voi
   }
 }
 
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+async function getJson<T>(url: string, token?: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: token ? { authorization: `Bearer ${token}` } : undefined
+  });
   if (!response.ok) {
     throw new Error(`Request failed: ${response.status} ${response.statusText}`);
   }
@@ -97,7 +99,10 @@ export class AgentRuntime {
   }
 
   private async pollTasks(): Promise<void> {
-    const tasks = await getJson<TaskRequest[]>(`${this.config.hubUrl}/api/task-requests?deviceId=${this.config.deviceId}`);
+    const tasks = await getJson<TaskRequest[]>(
+      `${this.config.hubUrl}/api/task-requests?deviceId=${this.config.deviceId}`,
+      this.config.sharedToken
+    );
 
     for (const task of tasks) {
       if (task.status === "executing" || task.status === "completed") {
