@@ -23,6 +23,7 @@ import {
   listBase44EvidencePackages,
   listBase44IntegrityAlerts
 } from "./base44Snapshots";
+import { listOsirisConnectorSummaries, readOsirisSnapshotFile } from "./osirisSnapshots";
 import { renderDashboard } from "./html";
 import { MissionControlStore } from "./store";
 
@@ -134,6 +135,8 @@ function buildDiscoveryManifest(options: HubServerOptions, requestUrl: URL) {
         base44Snapshots: `${origin}/api/base44/snapshots`,
         base44IntegrityAlerts: `${origin}/api/base44/integrity-alerts`,
         base44EvidencePackages: `${origin}/api/base44/evidence-packages`,
+        osirisSnapshots: `${origin}/api/osiris/snapshots`,
+        refreshOsirisSnapshot: `${origin}/api/osiris/refresh`,
         refreshInventory: `${origin}/api/base44/refresh-inventory`,
         refreshPeek: `${origin}/api/base44/refresh-peek`,
         acknowledgeIntegrityAlert: `${origin}/api/base44/integrity-alerts/acknowledge`,
@@ -239,6 +242,13 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "GET" && url.pathname === "/api/ai/records") {
         return sendJson(response, 200, {
           records: listAiMemoryRecordsByQuery(url.searchParams.get("kind") ?? undefined)
+        });
+      }
+
+      if (method === "GET" && url.pathname === "/api/osiris/snapshots") {
+        return sendJson(response, 200, {
+          snapshot: readOsirisSnapshotFile(process.cwd()),
+          connectors: listOsirisConnectorSummaries(process.cwd()),
         });
       }
 
@@ -499,6 +509,15 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "POST" && url.pathname === "/api/council/sessions") {
         const input = councilSessionInputSchema.parse(await readJsonBody(request));
         return sendJson(response, 201, options.store.createCouncilSession(input));
+      }
+
+      if (method === "POST" && url.pathname === "/api/osiris/refresh") {
+        return sendJson(response, 200, {
+          ok: true,
+          message:
+            "Osiris snapshot refresh is handled by osiris-rising-app/scripts sync:bridges on the operator machine.",
+          connectors: listOsirisConnectorSummaries(process.cwd()),
+        });
       }
 
       if (method === "POST" && url.pathname === "/api/base44/refresh-inventory") {

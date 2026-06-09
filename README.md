@@ -102,6 +102,30 @@ Check whether the local Mission Control token is present without printing it:
 npm run token:status
 ```
 
+Export a read-only operational snapshot into CANONICAL (`01_OPS/REMINDERS/MISSION_CONTROL_LAST.md`):
+
+```bash
+npm run export:canonical-status
+```
+
+Optional Tailscale refresh before export:
+
+```bash
+npm run export:canonical-status -- --refresh-network
+```
+
+Register hub logon task (Windows):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/windows/Register-MissionControlHubTask.ps1 -Port 8788
+```
+
+Register CANONICAL daily export (from CANONICAL tree):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File 01_OPS/mission-control/Register-MissionControlExportTask.ps1
+```
+
 Start the Windows agent:
 
 ```bash

@@ -43,6 +43,29 @@ function resolveEnvFiles(cwd: string, env: NodeJS.ProcessEnv): string[] {
   return [resolved, ...DEFAULT_ENV_FILES.map((fileName) => path.join(cwd, fileName))];
 }
 
+export function resolveMissionControlHubUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.MISSION_CONTROL_HUB_URL?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const bindHost = env.MISSION_CONTROL_HOST?.trim() || "127.0.0.1";
+  const probeHost = bindHost === "0.0.0.0" ? "127.0.0.1" : bindHost;
+  const port = env.MISSION_CONTROL_PORT?.trim() || "8787";
+  return `http://${probeHost}:${port}`;
+}
+
+export function loopbackHubProbeUrls(primaryUrl: string): string[] {
+  const normalized = primaryUrl.replace(/\/$/, "");
+  const candidates = [normalized];
+
+  for (const port of ["8787", "8788"]) {
+    candidates.push(`http://127.0.0.1:${port}`);
+  }
+
+  return Array.from(new Set(candidates));
+}
+
 export function loadMissionControlEnv(cwd: string = process.cwd(), env: NodeJS.ProcessEnv = process.env): string[] {
   const loaded: string[] = [];
 
