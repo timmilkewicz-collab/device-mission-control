@@ -1,8 +1,9 @@
 import { execFileSync } from "node:child_process";
 import { resolveDataPath } from "../shared/paths";
 import { DeviceRegistration, generateId, nowIso, Observation, ProcessSnapshot, ServiceSnapshot } from "../shared/types";
-import { MissionControlStore } from "./store";
 import { baseTaskCatalog } from "../agent/tasks";
+import { CANONICAL_LINUX_NODE_ID } from "./reconcileGoliathIdentity";
+import { MissionControlStore } from "./store";
 
 const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 
@@ -10,11 +11,15 @@ const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MI
 const user = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_USER ?? process.env.MISSION_CONTROL_PROLIANT_SSH_USER ?? "macro";
 const password = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PASSWORD ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
 const port = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PORT ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
-const deviceId = process.env.MISSION_CONTROL_REMOTE_LINUX_DEVICE_ID ?? process.env.MISSION_CONTROL_PROLIANT_DEVICE_ID ?? "proliant-ubuntu";
+
+const deviceId =
+  process.env.MISSION_CONTROL_REMOTE_LINUX_DEVICE_ID ??
+  process.env.MISSION_CONTROL_PROLIANT_DEVICE_ID ??
+  CANONICAL_LINUX_NODE_ID;
 const displayName =
   process.env.MISSION_CONTROL_REMOTE_LINUX_DISPLAY_NAME ??
   process.env.MISSION_CONTROL_PROLIANT_DISPLAY_NAME ??
-  "Unverified Linux Host (goliathsystem)";
+  "Goliath System (goliathsystem)";
 
 if (!password) {
   throw new Error(

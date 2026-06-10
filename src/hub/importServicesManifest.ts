@@ -1,12 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
+import { loadMissionControlEnv } from "../shared/env";
+import { resolveServicesManifestPath } from "../shared/canonical";
 import { resolveDataPath } from "../shared/paths";
 import { MissionControlStore } from "./store";
 
-const defaultManifestPath =
-  "C:\\Users\\Tim Milkewicz\\Dropbox\\CANONICAL\\02_PROJECTS\\TIM_PRIVATE\\.github\\services.manifest";
-
-const manifestPath = process.env.MISSION_CONTROL_SERVICES_MANIFEST_PATH ?? defaultManifestPath;
+loadMissionControlEnv();
+const manifestPath = resolveServicesManifestPath();
 const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const now = new Date().toISOString();
 
@@ -87,8 +87,10 @@ function importEntry(entry: ManifestEntry): void {
   });
 }
 
-if (!fs.existsSync(manifestPath)) {
-  throw new Error(`Services manifest not found: ${manifestPath}`);
+if (!manifestPath || !fs.existsSync(manifestPath)) {
+  throw new Error(
+    "Services manifest not found. Set MISSION_CONTROL_SERVICES_MANIFEST_PATH or ensure CANONICAL_ROOT resolves to a tree with 02_PROJECTS/TIM_PRIVATE/.github/services.manifest."
+  );
 }
 
 const lines = fs.readFileSync(manifestPath, "utf8").split(/\r?\n/);

@@ -1,34 +1,37 @@
 # Current State
 
-Last updated: 2026-06-01
+Last updated: 2026-06-09
 
-**Today’s operator focus:** Charleston physical ops first; control plane checkpoint is done; one after-work verify-only task — field proof visibility for `pure-canonical-core.org` from Scott’s user-level entry point. See `docs/ai/ACTIVE_PRIORITIES.md` and `docs/ai/DAILY_CHECKPOINT_2026-06-01.md`.
+Device Mission Control is a local observer-first hub with dashboard, peer inbox, council bridge, device/node/link registry, task approval queue, Base44 control surface, integrity review queue, and evidence package queue.
 
-Device Mission Control is a local observer-first hub with a browser dashboard, peer inbox, council bridge, device/node/link registry, task approval queue, Base44 control surface, integrity review queue, and evidence package queue.
+## CANONICAL integration
 
-The repo now uses a portable AI memory model:
+- Registered in `CANONICAL/00_CONTROL_PLANE` as private Goliath + CANONICAL runtime awareness layer
+- `npm run export:canonical-status` writes `01_OPS/REMINDERS/MISSION_CONTROL_LAST.md`
+- Daily routine and optional scheduled task (`CANONICAL Mission Control Export` @ 08:30) refresh the snapshot
+- Repo stays at `Documents/device-mission-control` (Option A)
 
-- `AGENTS.md` defines the active agent roles and default loop
-- `docs/ai/project-context.md` holds stable operating context
-- decision records, handoffs, and runbooks live under `docs/ai/`
+## Security posture
 
-Current implementation boundary:
+- Hub binds to `127.0.0.1` by default
+- Non-loopback startup requires `MISSION_CONTROL_TOKEN`
+- Hub, agents, and council demo load `.env.local` automatically
+- `npm run token:status` confirms token presence without printing it
 
-- markdown files are the source of truth for AI memory
-- the hub displays AI memory read-only through `/api/ai/overview`, `/api/ai/records`, and the dashboard
-- Base44 domain docs stay in `docs/base44/`
-- archived research/reference material stays in `docs/archive/`
+## Production deployment
 
-Current security posture:
+- Hub logon task: `scripts/windows/Register-MissionControlHubTask.ps1` (see port 8787 note vs operator dashboard)
+- Agent rollout: `docs/ai/runbooks/agent-deployment.md`
+- Export ritual: `docs/ai/runbooks/canonical-status-export.md`
+- CI: `.github/workflows/ci.yml`
 
-- the hub binds to `127.0.0.1` by default
-- no-token dashboard write actions are only allowed on loopback-bound startup
-- non-loopback startup requires `MISSION_CONTROL_TOKEN`
-- hub, agents, and council demo load `.env.local` automatically for Mission Control token settings
-- `npm run token:status` confirms token presence by fingerprint without printing the token
+## Network inventory caution
 
-Current network inventory caution:
+- `Tim-Laptop` and `DESKTOP-HN4P1BS` are Windows tailnet peers
+- `goliathsystem` is the **canonical Linux node id** (legacy `proliant-ubuntu` merged 2026-06-09); hardware role as ProLiant still needs human confirmation
+- Refresh tailscale + SSH paths before trusting exported link status
 
-- `Tim-Laptop` and `DESKTOP-HN4P1BS` are live Windows tailnet peers
-- `192.168.0.174` / `goliathsystem` was previously labeled `ProLiant Ubuntu Server`, but that identity is now unconfirmed
-- do not treat `192.168.0.174` as the server until a fresh identity check verifies the actual hardware
+## AI memory
+
+- Markdown under `docs/ai/` is canonical; hub `/api/ai/*` is read-only mirror
+- `AGENTS.md` defines Planner / Builder / QA / Librarian loop

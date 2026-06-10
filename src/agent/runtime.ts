@@ -42,7 +42,9 @@ async function postJson(url: string, body: unknown, token?: string): Promise<voi
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+    const responseBody = await response.text();
+    const detail = responseBody.trim() ? `: ${responseBody.trim().slice(0, 600)}` : "";
+    throw new Error(`Request failed: ${response.status} ${response.statusText}${detail}`);
   }
 }
 

@@ -88,11 +88,13 @@ async function getServiceSummary(): Promise<ServiceSnapshot[]> {
       return [];
     }
 
-    const parsed = JSON.parse(raw) as Array<{ Name: string; Status: string; DisplayName: string }> | { Name: string; Status: string; DisplayName: string };
+    const parsed = JSON.parse(raw) as
+      | Array<{ Name: string; Status: string | number; DisplayName?: string }>
+      | { Name: string; Status: string | number; DisplayName?: string };
     const list = Array.isArray(parsed) ? parsed : [parsed];
     return list.map((item) => ({
       name: item.Name,
-      status: item.Status,
+      status: String(item.Status),
       detail: item.DisplayName
     }));
   } catch {

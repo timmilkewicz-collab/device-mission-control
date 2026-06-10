@@ -1,30 +1,33 @@
 # Active Priorities
 
-Last updated: 2026-06-01
+Last updated: 2026-06-09
 
-## Done
+## Done (Mission Control finish line)
 
-- CANONICAL checkpoint filed
-- `ACTIVE_PRIORITIES.md` rewritten
-- `DAILY_CHECKPOINT_2026-06-01.md` created
+- CANONICAL project card + `PROJECT_INDEX.csv` registration
+- Read-only `MISSION_CONTROL_LAST.md` exporter + daily JSON log
+- Scheduled export task registrar (`Register-MissionControlExportTask.ps1`)
+- Daily routine wires export + nudge echo + council cue
+- Ambient signals track Mission Control staleness
+- Portable services manifest path via `CANONICAL_ROOT`
+- GitHub Actions CI (`check` + `test`)
+- Windows hub logon task scripts + deployment runbooks
 
-## Active (top three)
+## Active (operator)
 
-1. Charleston physical ops
-2. Control plane checkpoint — already complete
-3. After-work desk task: verify `pure-canonical-core.org` field proof path from Scott’s user-level entry point
+1. **Refresh network truth** — run `npm run sync:tailscale`, `verify:tailscale`, then `export:canonical-status -- --refresh-network`
+2. **Resolve ProLiant / goliathsystem identity** — confirm host before trusting `proliant-ubuntu` node
+3. **Hub on DHD-Admin** — register logon task (`scripts/windows/Register-MissionControlHubTask.ps1`); use port **8788** if operator dashboard keeps 8787
+4. **Second-machine agent** — deploy Windows/Linux agent per `docs/ai/runbooks/agent-deployment.md`
+5. **Scott field-proof check** — verify `pure-canonical-core.org/field-proof` visibility (external Base44 app)
 
-## Do not start (caged)
+## Deferred (explicit)
 
-- Typecheck debt
-- New apps
-- PrismBurst licensing packet
-- EndpointPulse / Goliath deployment
-- Honey Do build
-- Random folder cleanup
+- Desktop control pilot (blocked by readiness gate)
+- Hub AI memory write API
+- General remote SSH task routing beyond `collect:proliant`
+- Option B code copy into `CANONICAL/30_CODE/device-mission-control`
 
-## Operating rule for today
+## Operating rule
 
-Physical ops first. Control plane already did its job. One verification task later. No new goblins.
-
-When back at the desk, the only allowed digital task is the field-proof visibility check. Verify only. No redesign, no deploy spiral, no new branches.
+Physical ops first. Mission Control is **private runtime awareness** — refresh before trusting exported node/link truth. No public exposure without token.

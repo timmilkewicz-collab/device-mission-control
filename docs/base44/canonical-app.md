@@ -24,7 +24,7 @@ Do not hardcode live keys into committed code or docs. Keep the real key in a lo
 
 Create a local file named:
 
-`C:\Users\Tim Milkewicz\Documents\New project\.env.canonical.local`
+`C:\Users\Tim Milkewicz\Documents\device-mission-control\.env.canonical.local`
 
 with:
 

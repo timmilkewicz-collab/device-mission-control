@@ -111,28 +111,25 @@ function seedKnownNodes(): void {
   });
 
   store.upsertNode({
-    nodeId: "proliant-ubuntu",
-    label: "Unverified Linux Host (goliathsystem)",
-    kind: "machine",
-    platform: "ubuntu",
-    status: "offline",
+    nodeId: "goliathsystem",
+    label: "Goliath System",
+    kind: "server",
+    platform: "linux",
+    status: "reachable",
     linkedNodeIds: [],
-    agentSurfaces: [],
+    agentSurfaces: ["tailscale-ssh"],
     capabilities: ["ssh", "council", "logs"],
     reachability: {
-      tailscale: false,
-      ssh: false,
+      tailscale: true,
+      ssh: true,
       localAgent: false,
       companion: false,
-      notes: [
-        "Older probe identified 192.168.0.174 as goliathsystem",
-        "Hardware identity is not confirmed; user flagged this may be the oldest laptop, not the server"
-      ]
+      notes: ["Canonical Tailscale identity for the Linux server lane"]
     },
-    tags: ["ubuntu", "partial", "identity-unverified"],
+    tags: ["tailscale", "server", "goliath"],
     notes: [
-      "Previously labeled ProLiant Ubuntu Server from an old SSH observation.",
-      "Do not treat this as the confirmed server until a fresh reachability and identity check succeeds."
+      "Canonical node id for the Linux server discovered as goliathsystem on Tailscale.",
+      "SSH path and hardware role still need explicit human confirmation before production tasks."
     ],
     lastSeenAt: now
   });
@@ -186,15 +183,15 @@ function seedKnownLinks(): void {
   });
 
   store.upsertLink({
-    linkId: "dhd-admin-to-proliant-ssh",
+    linkId: "dhd-admin-to-goliath-ssh",
     sourceNodeId: "dhd-admin",
-    targetNodeId: "proliant-ubuntu",
+    targetNodeId: "goliathsystem",
     transport: "ssh",
     status: "offline",
-    label: "DHD-Admin to unverified goliathsystem host over SSH",
+    label: "DHD-Admin to Goliath System over SSH",
     notes: [
-      "Older SSH probe reached 192.168.0.174",
-      "Current hardware identity is unconfirmed; do not label as server until re-verified"
+      "SSH probe target defaults to LAN host 192.168.0.174 when configured",
+      "Hardware role still needs explicit human confirmation before production tasks"
     ],
     lastCheckedAt: now
   });

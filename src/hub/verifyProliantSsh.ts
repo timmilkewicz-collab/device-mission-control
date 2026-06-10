@@ -3,7 +3,9 @@ import { resolveDataPath } from "../shared/paths";
 import { MissionControlStore } from "./store";
 
 const store = new MissionControlStore(resolveDataPath("hub-state.json"));
-const linkId = "dhd-admin-to-proliant-ssh";
+import { CANONICAL_SSH_LINK_ID, LEGACY_SSH_LINK_ID } from "./reconcileGoliathIdentity";
+
+const linkId = CANONICAL_SSH_LINK_ID;
 const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
 const user = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_USER ?? process.env.MISSION_CONTROL_PROLIANT_SSH_USER;
 const keyPath = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_KEY_PATH ?? process.env.MISSION_CONTROL_PROLIANT_SSH_KEY_PATH;
@@ -23,9 +25,11 @@ function cleanNotes(notes: string[]): string[] {
   return notes.filter((note) => !prefixes.some((prefix) => note.startsWith(prefix)));
 }
 
-const link = store.getLinks().find((entry) => entry.linkId === linkId);
+const link =
+  store.getLinks().find((entry) => entry.linkId === linkId) ??
+  store.getLinks().find((entry) => entry.linkId === LEGACY_SSH_LINK_ID);
 if (!link) {
-  throw new Error(`Unknown link ${linkId}`);
+  throw new Error(`Unknown SSH link (${linkId} or ${LEGACY_SSH_LINK_ID})`);
 }
 
 const baseNotes = cleanNotes(link.notes);
