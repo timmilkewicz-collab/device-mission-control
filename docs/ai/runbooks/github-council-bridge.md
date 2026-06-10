@@ -76,6 +76,38 @@ Expected result:
 - PR comments from GitHub/Copilot-like authors are marked in the prompt when present
 - failing workflow runs or risk-sensitive paths produce a `concern` stance
 
+## Mirror into Osiris (GitHub Mesh)
+
+After council sessions exist in Mission Control, mirror them into Osiris Firestore for the HOQS operator lane.
+
+1. Confirm hub-state has GitHub bridge sessions (topic format: `GitHub PR Review - owner/repo#number`, `requestedBy: github-council-bridge`).
+2. From `osiris-rising-app/scripts`, run:
+
+```powershell
+npm run sync:github
+```
+
+Or sync all bridges:
+
+```powershell
+npm run sync:bridges
+```
+
+3. Firebase credentials are required on the operator machine:
+   - `GOOGLE_APPLICATION_CREDENTIALS` pointing at a service account JSON, or
+   - `gcloud auth application-default login`, or
+   - `firebase login` (REST fallback when Admin SDK ADC is unavailable).
+
+4. Expected Firestore paths:
+   - `connector_sync/github-mesh`
+   - `connector_sync/github-mesh/open_prs/{sessionId}`
+
+5. In the Osiris Flutter app, open the HOQS lane and confirm `GitHub Mesh` shows open PR rows. Reads require the `isOsirisOperator` gate.
+
+6. Re-run behavior:
+   - Re-running `npm run github:council` appends a new verifier response to the same open session when the topic matches.
+   - Re-running `npm run sync:github` upserts current open sessions and prunes stale `open_prs` documents that no longer match.
+
 ## Verification
 
 Open the hub dashboard or query:
