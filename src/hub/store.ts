@@ -22,6 +22,56 @@ import {
 } from "../shared/types";
 import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "./operationalPlanner";
 
+function parseUpdatedAt(value: string | undefined): number {
+  if (!value) {
+    return 0;
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+export function mergeCouncilSessionsById(
+  diskSessions: CouncilSession[],
+  memorySessions: CouncilSession[],
+): CouncilSession[] {
+  const merged = new Map<string, CouncilSession>();
+  for (const session of diskSessions) {
+    merged.set(session.id, session);
+  }
+  for (const session of memorySessions) {
+    const existing = merged.get(session.id);
+    if (!existing || parseUpdatedAt(session.updatedAt) >= parseUpdatedAt(existing.updatedAt)) {
+      merged.set(session.id, session);
+    }
+  }
+  return Array.from(merged.values());
+}
+
+export function mergeTaskRequestsById(
+  diskTasks: TaskRequest[],
+  memoryTasks: TaskRequest[],
+): TaskRequest[] {
+  const merged = new Map<string, TaskRequest>();
+  for (const task of diskTasks) {
+    merged.set(task.id, task);
+  }
+  for (const task of memoryTasks) {
+    const existing = merged.get(task.id);
+    if (!existing || parseUpdatedAt(task.updatedAt) >= parseUpdatedAt(existing.updatedAt)) {
+      merged.set(task.id, task);
+    }
+  }
+  return Array.from(merged.values());
+}
+
+export function mergeHubStateForSave(memory: HubState, disk: HubState): HubState {
+  return {
+    ...memory,
+    councilSessions: mergeCouncilSessionsById(disk.councilSessions, memory.councilSessions),
+    taskRequests: mergeTaskRequestsById(disk.taskRequests, memory.taskRequests),
+  };
+}
+
 export class MissionControlStore {
   private state: HubState;
 
@@ -318,6 +368,17 @@ export class MissionControlStore {
     return this.state.councilSessions.find((entry) => entry.id === sessionId);
   }
 
+  getStateFilePath(): string {
+    return this.filePath;
+  }
+
+  getStateFileUpdatedAtUtc(): string | undefined {
+    if (!fs.existsSync(this.filePath)) {
+      return undefined;
+    }
+    return fs.statSync(this.filePath).mtime.toUTCString();
+  }
+
   getNodes(): NodeRecord[] {
     return Object.values(this.state.nodes).sort((left, right) => left.label.localeCompare(right.label));
   }
@@ -339,6 +400,13 @@ export class MissionControlStore {
     return hubStateSchema.parse(JSON.parse(raw));
   }
 
+  private loadDiskState(): HubState | null {
+    if (!fs.existsSync(this.filePath)) {
+      return null;
+    }
+    return this.load();
+  }
+
   private refreshDerivedState(): void {
     this.state.desktopControlEvaluation = evaluateDesktopControlReadiness(this.state);
     this.state.planSnapshots.push(buildPlanSnapshot(this.state));
@@ -346,6 +414,12 @@ export class MissionControlStore {
   }
 
   private save(): void {
-    fs.writeFileSync(this.filePath, JSON.stringify(this.state, null, 2));
+    const diskState = this.loadDiskState();
+    const merged = diskState ? mergeHubStateForSave(this.state, diskState) : this.state;
+    const payload = JSON.stringify(merged, null, 2);
+    const tempPath = `${this.filePath}.${process.pid}.tmp`;
+    fs.writeFileSync(tempPath, payload, "utf8");
+    fs.renameSync(tempPath, this.filePath);
+    this.state = merged;
   }
 }

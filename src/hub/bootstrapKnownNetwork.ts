@@ -1,7 +1,13 @@
+import { loadMissionControlEnv } from "../shared/env";
 import { resolveDataPath } from "../shared/paths";
+import { assertHubNotRunningForDiskWrites } from "./hubLiveGuard";
 import { MissionControlStore } from "./store";
 
-const store = new MissionControlStore(resolveDataPath("hub-state.json"));
+async function main(): Promise<void> {
+  loadMissionControlEnv();
+  await assertHubNotRunningForDiskWrites();
+
+  const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const now = new Date().toISOString();
 
 function seedKnownNodes(): void {
@@ -201,3 +207,9 @@ seedKnownNodes();
 seedKnownLinks();
 
 console.log(`Seeded known network topology into ${resolveDataPath("hub-state.json")}`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

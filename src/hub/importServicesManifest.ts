@@ -3,11 +3,15 @@ import path from "node:path";
 import { loadMissionControlEnv } from "../shared/env";
 import { resolveServicesManifestPath } from "../shared/canonical";
 import { resolveDataPath } from "../shared/paths";
+import { assertHubNotRunningForDiskWrites } from "./hubLiveGuard";
 import { MissionControlStore } from "./store";
 
-loadMissionControlEnv();
-const manifestPath = resolveServicesManifestPath();
-const store = new MissionControlStore(resolveDataPath("hub-state.json"));
+async function main(): Promise<void> {
+  loadMissionControlEnv();
+  await assertHubNotRunningForDiskWrites();
+
+  const manifestPath = resolveServicesManifestPath();
+  const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const now = new Date().toISOString();
 
 type ManifestEntry = {
@@ -101,3 +105,9 @@ for (const entry of entries) {
 }
 
 console.log(`Imported ${entries.length} services from ${path.basename(manifestPath)} into ${resolveDataPath("hub-state.json")}`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

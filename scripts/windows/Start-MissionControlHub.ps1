@@ -21,8 +21,12 @@ $discoveryUrl = "http://127.0.0.1:${Port}/.well-known/mission-control.json"
 try {
   $resp = Invoke-WebRequest -Uri $discoveryUrl -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
   if ($resp.StatusCode -eq 200) {
-    Write-HubLog "Skip start: discovery manifest already live at $discoveryUrl"
-    exit 0
+    $manifest = $resp.Content | ConvertFrom-Json
+    if ($manifest.name -eq 'device-mission-control') {
+      Write-HubLog "Skip start: Mission Control hub already live at $discoveryUrl"
+      exit 0
+    }
+    Write-HubLog "Port $Port serves a non-Mission-Control process; starting hub anyway."
   }
 }
 catch {

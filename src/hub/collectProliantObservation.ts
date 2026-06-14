@@ -1,11 +1,17 @@
 import { execFileSync } from "node:child_process";
+import { loadMissionControlEnv } from "../shared/env";
 import { resolveDataPath } from "../shared/paths";
 import { DeviceRegistration, generateId, nowIso, Observation, ProcessSnapshot, ServiceSnapshot } from "../shared/types";
 import { baseTaskCatalog } from "../agent/tasks";
 import { CANONICAL_LINUX_NODE_ID } from "./reconcileGoliathIdentity";
+import { assertHubNotRunningForDiskWrites } from "./hubLiveGuard";
 import { MissionControlStore } from "./store";
 
-const store = new MissionControlStore(resolveDataPath("hub-state.json"));
+async function main(): Promise<void> {
+  loadMissionControlEnv();
+  await assertHubNotRunningForDiskWrites();
+
+  const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 
 const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
 const user = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_USER ?? process.env.MISSION_CONTROL_PROLIANT_SSH_USER ?? "macro";
@@ -190,3 +196,9 @@ const observation: Observation = {
 store.addObservation(observation);
 
 console.log(`Collected remote observation for ${deviceId} from ${host}`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

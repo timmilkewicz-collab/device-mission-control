@@ -1,8 +1,14 @@
+import { loadMissionControlEnv } from "../shared/env";
 import { resolveDataPath } from "../shared/paths";
+import { assertHubNotRunningForDiskWrites } from "./hubLiveGuard";
 import { MissionControlStore } from "./store";
 import { getTailscaleStatus, normalizeNodeId, pingTailscalePeer, TailscalePeer } from "./tailscale";
 
-const store = new MissionControlStore(resolveDataPath("hub-state.json"));
+async function main(): Promise<void> {
+  loadMissionControlEnv();
+  await assertHubNotRunningForDiskWrites();
+
+  const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 const checkedAt = new Date().toISOString();
 const status = getTailscaleStatus();
 const selfNodeId = normalizeNodeId(status.Self.HostName);
@@ -114,3 +120,9 @@ for (const result of results) {
   const route = result.routeQuality ? ` (${result.routeQuality})` : "";
   console.log(`${prefix}${route} ${result.nodeId}: ${result.detail}`);
 }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

@@ -1,9 +1,15 @@
 import { execFileSync } from "node:child_process";
+import { loadMissionControlEnv } from "../shared/env";
 import { resolveDataPath } from "../shared/paths";
+import { assertHubNotRunningForDiskWrites } from "./hubLiveGuard";
+import { CANONICAL_SSH_LINK_ID, LEGACY_SSH_LINK_ID } from "./reconcileGoliathIdentity";
 import { MissionControlStore } from "./store";
 
-const store = new MissionControlStore(resolveDataPath("hub-state.json"));
-import { CANONICAL_SSH_LINK_ID, LEGACY_SSH_LINK_ID } from "./reconcileGoliathIdentity";
+async function main(): Promise<void> {
+  loadMissionControlEnv();
+  await assertHubNotRunningForDiskWrites();
+
+  const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 
 const linkId = CANONICAL_SSH_LINK_ID;
 const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
@@ -154,3 +160,9 @@ try {
   console.log(`${isOffline ? "[offline]" : isAuthError ? "[blocked]" : "[attempting]"} ${user}@${host}: ${stderr}`);
   process.exit(1);
 }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

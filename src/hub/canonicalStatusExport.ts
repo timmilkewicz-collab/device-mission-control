@@ -9,7 +9,7 @@ import {
 } from "./base44Snapshots";
 import { listOsirisConnectorSummaries } from "./osirisSnapshots";
 import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "./operationalPlanner";
-import { resolveDataPath } from "../shared/paths";
+import { resolveDataPath, resolveMissionControlDataDir } from "../shared/paths";
 import { HubState, hubStateSchema } from "../shared/types";
 
 export type CanonicalStatusExportOptions = {
@@ -187,7 +187,7 @@ export function buildCanonicalStatusSnapshot(
   const host = options.host ?? process.env.MISSION_CONTROL_HOST?.trim() ?? "127.0.0.1";
   const tokenPresent = options.tokenPresent ?? Boolean(process.env.MISSION_CONTROL_TOKEN?.trim());
   const statePath = options.hubStatePath ?? resolveDataPath("hub-state.json");
-  const dataDir = options.dataDir ?? path.join(cwd, ".mission-control", "data");
+  const dataDir = options.dataDir ?? resolveMissionControlDataDir();
   const inboxPath = options.inboxPath ?? resolveDataPath("inbox.jsonl");
 
   const { state, updatedAtUtc } = loadHubStateFromDisk(statePath);
@@ -304,7 +304,7 @@ export async function enrichSnapshotWithHubReachability(
     reachability = result;
   }
 
-  return {
+  const base = {
     ...snapshot,
     hub: {
       ...snapshot.hub,
@@ -313,6 +313,63 @@ export async function enrichSnapshotWithHubReachability(
       manifestVersion: reachability.manifestVersion
     }
   };
+
+  if (!reachability.reachable) {
+    return base;
+  }
+
+  try {
+    const stateResponse = await fetch(`${resolvedUrl.replace(/\/$/, "")}/api/state`, {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!stateResponse.ok) {
+      return base;
+    }
+
+    const payload = (await stateResponse.json()) as { state?: HubState };
+    if (!payload.state) {
+      return base;
+    }
+
+    const hubState = hubStateSchema.parse(payload.state);
+    const openCouncilSessions = hubState.councilSessions.filter((session) => session.status === "open");
+
+    let stateUpdatedAtUtc = snapshot.hub.stateUpdatedAtUtc;
+    try {
+      const manifestResponse = await fetch(`${resolvedUrl.replace(/\/$/, "")}/.well-known/mission-control.json`, {
+        signal: AbortSignal.timeout(2500)
+      });
+      if (manifestResponse.ok) {
+        const manifest = (await manifestResponse.json()) as {
+          persistence?: { stateUpdatedAtUtc?: string };
+        };
+        stateUpdatedAtUtc = manifest.persistence?.stateUpdatedAtUtc ?? stateUpdatedAtUtc;
+      }
+    } catch {
+      // keep disk mtime
+    }
+
+    return {
+      ...base,
+      hub: {
+        ...base.hub,
+        stateUpdatedAtUtc
+      },
+      counts: {
+        ...base.counts,
+        openCouncilSessions: openCouncilSessions.length
+      },
+      openCouncilSessions: openCouncilSessions.map((session) => ({
+        id: session.id,
+        topic: session.topic,
+        status: session.status,
+        responseCount: session.responses.length,
+        updatedAt: session.updatedAt
+      }))
+    };
+  } catch {
+    return base;
+  }
 }
 
 export function renderCanonicalStatusMarkdown(snapshot: CanonicalStatusSnapshot): string {

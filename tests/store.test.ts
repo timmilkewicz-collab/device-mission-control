@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { MissionControlStore } from "../src/hub/store";
+import { mergeHubStateForSave, MissionControlStore } from "../src/hub/store";
+import { hubStateSchema, nowIso } from "../src/shared/types";
 
 test("store registers devices and creates approval-gated task requests", () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mission-control-"));
@@ -156,4 +157,88 @@ test("store resolves a single council session by id", () => {
   assert.equal(store.getCouncilSession(session.id)?.id, session.id);
   assert.equal(store.getCouncilSession(session.id)?.responses.length, 0);
   assert.equal(store.getCouncilSession("council-missing"), undefined);
+});
+
+test("mergeHubStateForSave keeps disk council sessions when memory omitted them", () => {
+  const disk = hubStateSchema.parse({});
+  const createdAt = nowIso();
+  disk.councilSessions = [
+    {
+      id: "council-disk",
+      topic: "GitHub PR Review - acme/widget#7",
+      prompt: "Review this PR",
+      status: "open",
+      requestedBy: "github-council-bridge",
+      targetMemberIds: [],
+      responses: [],
+      createdAt,
+      updatedAt: createdAt
+    }
+  ];
+  const memory = hubStateSchema.parse({});
+  memory.nodes = {
+    "probe-node": {
+      nodeId: "probe-node",
+      label: "Probe",
+      kind: "machine",
+      platform: "linux",
+      status: "active",
+      linkedNodeIds: [],
+      agentSurfaces: [],
+      capabilities: [],
+      reachability: { tailscale: false, ssh: false, localAgent: false, companion: false, notes: [] },
+      tags: [],
+      notes: [],
+      lastSeenAt: createdAt,
+      registeredAt: createdAt,
+      updatedAt: createdAt
+    }
+  };
+
+  const merged = mergeHubStateForSave(memory, disk);
+  assert.equal(merged.councilSessions.length, 1);
+  assert.equal(merged.councilSessions[0]?.id, "council-disk");
+  assert.equal(Object.keys(merged.nodes).length, 1);
+});
+
+test("MissionControlStore merge-on-save retains council session written while memory was stale", () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "mission-control-"));
+  const statePath = path.join(tempDir, "state.json");
+  const staleStore = new MissionControlStore(statePath);
+  const createdAt = nowIso();
+  const hubWritten = hubStateSchema.parse({
+    councilSessions: [
+      {
+        id: "council-hub",
+        topic: "GitHub PR Review - acme/widget#7",
+        prompt: "Review this PR",
+        status: "open",
+        requestedBy: "github-council-bridge",
+        targetMemberIds: [],
+        responses: [],
+        createdAt,
+        updatedAt: createdAt
+      }
+    ]
+  });
+  fs.writeFileSync(statePath, JSON.stringify(hubWritten, null, 2));
+
+  staleStore.upsertNode({
+    nodeId: "probe-node",
+    label: "Probe",
+    kind: "machine",
+    platform: "linux",
+    status: "active",
+    linkedNodeIds: [],
+    agentSurfaces: [],
+    capabilities: [],
+    reachability: { tailscale: false, ssh: false, localAgent: false, companion: false, notes: [] },
+    tags: [],
+    notes: []
+  });
+
+  const reloaded = hubStateSchema.parse(JSON.parse(fs.readFileSync(statePath, "utf8")));
+  assert.equal(reloaded.councilSessions.length, 1);
+  assert.equal(reloaded.councilSessions[0]?.id, "council-hub");
+  assert.ok(reloaded.nodes["probe-node"]);
 });

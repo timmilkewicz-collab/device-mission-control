@@ -81,7 +81,8 @@ Expected result:
 After council sessions exist in Mission Control, mirror them into Osiris Firestore for the HOQS operator lane.
 
 1. Confirm hub-state has GitHub bridge sessions (topic format: `GitHub PR Review - owner/repo#number`, `requestedBy: github-council-bridge`).
-2. From `osiris-rising-app/scripts`, run:
+2. **Persistence check:** `hub-state.json` on disk must match the live hub API. If `GET /api/council/sessions` shows sessions missing from disk, stop the hub, fix persistence (see Mission Control hub docs), and re-run the bridge. Osiris `sync:github` reads disk only.
+3. From `osiris-rising-app/scripts`, run:
 
 ```powershell
 npm run sync:github
@@ -103,6 +104,8 @@ npm run sync:bridges
    - `connector_sync/github-mesh/open_prs/{sessionId}`
 
 5. In the Osiris Flutter app, open the HOQS lane and confirm `GitHub Mesh` shows open PR rows. Reads require the `isOsirisOperator` gate.
+
+Repository authority: https://github.com/timmilkewicz-collab/osiris-rising-app (see `docs/REPOSITORY_AUTHORITY.md` in that repo).
 
 6. Re-run behavior:
    - Re-running `npm run github:council` appends a new verifier response to the same open session when the topic matches.

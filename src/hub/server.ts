@@ -149,7 +149,11 @@ function buildDiscoveryManifest(options: HubServerOptions, requestUrl: URL) {
       "GET /api/state",
       "GET /api/nodes",
       "GET /api/links"
-    ]
+    ],
+    persistence: {
+      statePath: options.store.getStateFilePath(),
+      stateUpdatedAtUtc: options.store.getStateFileUpdatedAtUtc()
+    }
   };
 }
 

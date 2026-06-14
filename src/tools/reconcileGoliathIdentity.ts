@@ -1,3 +1,4 @@
+import { loadMissionControlEnv } from "../shared/env";
 import { resolveDataPath } from "../shared/paths";
 import {
   applyGoliathIdentityReconciliation,
@@ -5,20 +6,31 @@ import {
   CANONICAL_SSH_LINK_ID,
   LEGACY_LINUX_NODE_ID
 } from "../hub/reconcileGoliathIdentity";
+import { assertHubNotRunningForDiskWrites } from "../hub/hubLiveGuard";
 import { MissionControlStore } from "../hub/store";
 
-const reconciled = applyGoliathIdentityReconciliation();
-const store = new MissionControlStore(resolveDataPath("hub-state.json"));
+async function main(): Promise<void> {
+  loadMissionControlEnv();
+  await assertHubNotRunningForDiskWrites();
 
-console.log(
-  JSON.stringify(
-    {
-      canonicalNode: CANONICAL_LINUX_NODE_ID,
-      legacyNodeRemoved: !Object.keys(reconciled.nodes).includes(LEGACY_LINUX_NODE_ID),
-      sshLink: CANONICAL_SSH_LINK_ID in reconciled.links,
-      linuxNodes: Object.keys(store.getState().nodes).filter((id) => id.includes("goliath") || id.includes("proliant"))
-    },
-    null,
-    2
-  )
-);
+  const reconciled = applyGoliathIdentityReconciliation();
+  const store = new MissionControlStore(resolveDataPath("hub-state.json"));
+
+  console.log(
+    JSON.stringify(
+      {
+        canonicalNode: CANONICAL_LINUX_NODE_ID,
+        legacyNodeRemoved: !Object.keys(reconciled.nodes).includes(LEGACY_LINUX_NODE_ID),
+        sshLink: CANONICAL_SSH_LINK_ID in reconciled.links,
+        linuxNodes: Object.keys(store.getState().nodes).filter((id) => id.includes("goliath") || id.includes("proliant"))
+      },
+      null,
+      2
+    )
+  );
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
