@@ -6,6 +6,7 @@ import {
   parseGitHubOrgList,
   parseGitHubRepoList,
   resolveGitHubCouncilRepos,
+  listGitHubAffiliatedRepositories,
   runGitHubCouncilBridge
 } from "../src/hub/githubCouncilBridge";
 
@@ -146,6 +147,12 @@ test("resolveGitHubCouncilRepos uses authenticated user repos for user namespace
         { name: "secret", owner: { login: "acme" }, full_name: "acme/secret", fork: false, archived: false },
       ]);
     }
+    if (input.includes("/user/repos?affiliation=")) {
+      return jsonResponse([
+        { name: "alpha", owner: { login: "acme" }, full_name: "acme/alpha", fork: false, archived: false },
+        { name: "secret", owner: { login: "acme" }, full_name: "acme/secret", fork: false, archived: false },
+      ]);
+    }
     return jsonResponse({ message: `unexpected URL ${input}` }, 404);
   };
 
@@ -191,6 +198,113 @@ test("resolveGitHubCouncilRepos merges explicit repos and org discovery", async 
     ["acme/explicit", "acme/alpha"]
   );
   assert.equal(calls.some((url) => url.includes("/orgs/acme/repos")), true);
+});
+
+test("listGitHubAffiliatedRepositories returns private cross-namespace repos for allowed owners", async () => {
+  const calls: string[] = [];
+  const fetchImpl: FetchLike = async (input) => {
+    calls.push(input);
+    if (input.includes("/user/repos?affiliation=")) {
+      return jsonResponse([
+        {
+          name: "alpha",
+          owner: { login: "acme" },
+          full_name: "acme/alpha",
+          fork: false,
+          archived: false,
+        },
+        {
+          name: "secret",
+          owner: { login: "partner" },
+          full_name: "partner/secret",
+          fork: false,
+          archived: false,
+        },
+        {
+          name: "other",
+          owner: { login: "unrelated" },
+          full_name: "unrelated/other",
+          fork: false,
+          archived: false,
+        },
+      ]);
+    }
+    return jsonResponse({ message: `unexpected URL ${input}` }, 404);
+  };
+
+  const repos = await listGitHubAffiliatedRepositories(["acme", "partner"], {
+    fetchImpl,
+    githubToken: "token",
+  });
+
+  assert.deepEqual(
+    repos.map((repo) => repo.slug),
+    ["acme/alpha", "partner/secret"],
+  );
+  assert.equal(calls.some((url) => url.includes("affiliation=owner%2Ccollaborator%2Corganization_member")), true);
+});
+
+test("resolveGitHubCouncilRepos merges affiliation repos across configured namespaces", async () => {
+  const calls: string[] = [];
+  const fetchImpl: FetchLike = async (input) => {
+    calls.push(input);
+    if (input.endsWith("/user")) {
+      return jsonResponse({ login: "acme" });
+    }
+    if (input.includes("/user/repos?affiliation=")) {
+      return jsonResponse([
+        {
+          name: "mine",
+          owner: { login: "acme" },
+          full_name: "acme/mine",
+          fork: false,
+          archived: false,
+        },
+        {
+          name: "shared",
+          owner: { login: "partner" },
+          full_name: "partner/shared",
+          fork: false,
+          archived: false,
+        },
+      ]);
+    }
+    if (input.includes("/user/repos?type=owner")) {
+      return jsonResponse([
+        {
+          name: "mine",
+          owner: { login: "acme" },
+          full_name: "acme/mine",
+          fork: false,
+          archived: false,
+        },
+      ]);
+    }
+    if (input.includes("/users/partner/repos")) {
+      return jsonResponse([
+        {
+          name: "public-only",
+          owner: { login: "partner" },
+          full_name: "partner/public-only",
+          fork: false,
+          archived: false,
+        },
+      ]);
+    }
+    return jsonResponse({ message: `unexpected URL ${input}` }, 404);
+  };
+
+  const { repos, errors } = await resolveGitHubCouncilRepos({
+    orgList: "acme,partner",
+    fetchImpl,
+    githubToken: "token",
+  });
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(
+    repos.map((repo) => repo.slug).sort(),
+    ["acme/mine", "partner/public-only", "partner/shared"].sort(),
+  );
 });
 
 test("buildPullRequestCouncilPayload flags CI failures and sensitive paths", () => {

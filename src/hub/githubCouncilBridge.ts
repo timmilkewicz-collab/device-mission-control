@@ -477,6 +477,35 @@ async function listGitHubRepositoriesForPath(
   return repos;
 }
 
+const GITHUB_REPO_AFFILIATIONS = "owner,collaborator,organization_member";
+
+export async function listGitHubAffiliatedRepositories(
+  allowedOwners: string[],
+  options: Pick<GitHubCouncilBridgeOptions, "githubApiBase" | "githubToken" | "fetchImpl"> & {
+    includeForks?: boolean;
+    includeArchived?: boolean;
+  },
+): Promise<GitHubRepoRef[]> {
+  if (!options.githubToken || allowedOwners.length === 0) {
+    return [];
+  }
+
+  const allowed = new Set(allowedOwners.map((owner) => owner.toLowerCase()));
+  const repos = await listGitHubRepositoriesForPath(
+    `/user/repos?affiliation=${encodeURIComponent(GITHUB_REPO_AFFILIATIONS)}&per_page=100&page=`,
+    "",
+    {
+      fetchImpl: requireFetch(options.fetchImpl),
+      githubApiBase: options.githubApiBase ?? DEFAULT_GITHUB_API_BASE,
+      githubToken: options.githubToken,
+      includeForks: options.includeForks ?? false,
+      includeArchived: options.includeArchived ?? false,
+    },
+  );
+
+  return repos.filter((repo) => allowed.has(repo.owner.toLowerCase()));
+}
+
 export async function resolveGitHubCouncilRepos(options: {
   repoList?: string;
   orgList?: string;
@@ -509,6 +538,24 @@ export async function resolveGitHubCouncilRepos(options: {
     } catch (error) {
       errors.push({
         scope: org,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (orgs.length > 0 && options.githubToken) {
+    try {
+      const affiliatedRepos = await listGitHubAffiliatedRepositories(orgs, {
+        githubApiBase: options.githubApiBase,
+        githubToken: options.githubToken,
+        fetchImpl: options.fetchImpl,
+        includeForks: options.includeForks,
+        includeArchived: options.includeArchived,
+      });
+      discoveredRepos.push(...affiliatedRepos);
+    } catch (error) {
+      errors.push({
+        scope: "affiliation",
         message: error instanceof Error ? error.message : String(error),
       });
     }
