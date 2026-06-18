@@ -133,6 +133,37 @@ test("parseGitHubOrgList accepts org slugs and URLs", () => {
   assert.deepEqual(orgs, ["acme", "other-org", "third-org"]);
 });
 
+test("resolveGitHubCouncilRepos uses authenticated user repos for user namespaces", async () => {
+  const calls: string[] = [];
+  const fetchImpl: FetchLike = async (input) => {
+    calls.push(input);
+    if (input.endsWith("/user")) {
+      return jsonResponse({ login: "acme" });
+    }
+    if (input.includes("/user/repos?type=owner")) {
+      return jsonResponse([
+        { name: "alpha", owner: { login: "acme" }, full_name: "acme/alpha", fork: false, archived: false },
+        { name: "secret", owner: { login: "acme" }, full_name: "acme/secret", fork: false, archived: false },
+      ]);
+    }
+    return jsonResponse({ message: `unexpected URL ${input}` }, 404);
+  };
+
+  const { repos, errors } = await resolveGitHubCouncilRepos({
+    orgList: "acme",
+    fetchImpl,
+    githubToken: "token",
+  });
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(
+    repos.map((repo) => repo.slug),
+    ["acme/alpha", "acme/secret"],
+  );
+  assert.equal(calls.some((url) => url.includes("/user/repos?type=owner")), true);
+  assert.equal(calls.some((url) => url.includes("/users/acme/repos")), false);
+});
+
 test("resolveGitHubCouncilRepos merges explicit repos and org discovery", async () => {
   const calls: string[] = [];
   const fetchImpl: FetchLike = async (input) => {

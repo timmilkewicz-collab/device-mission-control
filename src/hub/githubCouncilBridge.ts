@@ -348,10 +348,31 @@ export function filterExcludedGitHubRepos(
 
 type GitHubOrgRepository = {
   name: string;
+  full_name?: string;
+  owner?: {
+    login?: string;
+  };
   fork?: boolean;
   archived?: boolean;
   disabled?: boolean;
 };
+
+async function readAuthenticatedGitHubLogin(
+  options: Pick<GitHubCouncilBridgeOptions, "githubApiBase" | "githubToken" | "fetchImpl">,
+): Promise<string | undefined> {
+  if (!options.githubToken) {
+    return undefined;
+  }
+
+  const fetchImpl = requireFetch(options.fetchImpl);
+  const githubApiBase = options.githubApiBase ?? DEFAULT_GITHUB_API_BASE;
+  const user = await githubGet<{ login?: string }>(
+    "/user",
+    { githubApiBase, githubToken: options.githubToken },
+    fetchImpl,
+  );
+  return user.login;
+}
 
 export async function listGitHubOrgRepositories(
   org: string,
@@ -364,11 +385,18 @@ export async function listGitHubOrgRepositories(
   const githubApiBase = options.githubApiBase ?? DEFAULT_GITHUB_API_BASE;
   const includeForks = options.includeForks ?? false;
   const includeArchived = options.includeArchived ?? false;
+  const listOptions = {
+    fetchImpl,
+    githubApiBase,
+    githubToken: options.githubToken,
+    includeForks,
+    includeArchived,
+  };
 
   const orgRepos = await listGitHubRepositoriesForPath(
     `/orgs/${encodeURIComponent(org)}/repos?type=all&per_page=100&page=`,
     org,
-    { fetchImpl, githubApiBase, githubToken: options.githubToken, includeForks, includeArchived },
+    listOptions,
   ).catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     if (!message.includes("(404)")) {
@@ -381,10 +409,19 @@ export async function listGitHubOrgRepositories(
     return orgRepos;
   }
 
+  const login = await readAuthenticatedGitHubLogin(options);
+  if (login && login.toLowerCase() === org.toLowerCase()) {
+    return listGitHubRepositoriesForPath(
+      `/user/repos?type=owner&per_page=100&page=`,
+      org,
+      listOptions,
+    );
+  }
+
   return listGitHubRepositoriesForPath(
     `/users/${encodeURIComponent(org)}/repos?type=owner&per_page=100&page=`,
     org,
-    { fetchImpl, githubApiBase, githubToken: options.githubToken, includeForks, includeArchived },
+    listOptions,
   );
 }
 
@@ -423,7 +460,12 @@ async function listGitHubRepositoriesForPath(
       if (entry.disabled) {
         continue;
       }
-      repos.push({ owner, repo: entry.name, slug: `${owner}/${entry.name}` });
+      const ownerLogin = entry.owner?.login ?? owner;
+      repos.push({
+        owner: ownerLogin,
+        repo: entry.name,
+        slug: entry.full_name ?? `${ownerLogin}/${entry.name}`,
+      });
     }
 
     if (payload.length < 100) {
