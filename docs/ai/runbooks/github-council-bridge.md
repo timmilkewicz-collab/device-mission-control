@@ -21,7 +21,7 @@ $env:MISSION_CONTROL_GITHUB_REPOS = "owner/repo,owner/other-repo"
 Discover every non-archived repo in configured GitHub namespaces (organizations or user accounts). Cross-account private repos visible to your token are discovered via the authenticated affiliation API.
 
 ```powershell
-$env:MISSION_CONTROL_GITHUB_ORG = "timmilkewicz-collab,tbm898-source"
+$env:MISSION_CONTROL_GITHUB_ORG = "timmilkewicz-collab,tbm898-source,timgordianknot"
 $env:MISSION_CONTROL_GITHUB_EXCLUDE_REPOS = "timmilkewicz-collab/Meshroom"
 ```
 
