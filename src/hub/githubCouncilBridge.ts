@@ -281,6 +281,205 @@ export function parseGitHubRepoList(input: string | undefined): GitHubRepoRef[] 
   return repos;
 }
 
+export function parseGitHubOrgList(input: string | undefined): string[] {
+  if (!input || input.trim().length === 0) {
+    return [];
+  }
+
+  const seen = new Set<string>();
+  const orgs: string[] = [];
+
+  for (const rawEntry of input.split(/[,\n;]/)) {
+    let raw = rawEntry.trim();
+    if (!raw) {
+      continue;
+    }
+
+    if (/^https?:\/\//i.test(raw)) {
+      const url = new URL(raw);
+      raw = url.pathname.replace(/^\/+/, "").split("/")[0] ?? "";
+    }
+
+    const org = raw.replace(/^@/, "");
+    if (!org || !/^[A-Za-z0-9_.-]+$/.test(org)) {
+      throw new Error(`Invalid GitHub organization reference: ${rawEntry.trim()}`);
+    }
+
+    const dedupeKey = org.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+
+    seen.add(dedupeKey);
+    orgs.push(org);
+  }
+
+  return orgs;
+}
+
+export function mergeGitHubRepoRefs(...lists: GitHubRepoRef[][]): GitHubRepoRef[] {
+  const seen = new Set<string>();
+  const repos: GitHubRepoRef[] = [];
+
+  for (const list of lists) {
+    for (const repo of list) {
+      const dedupeKey = repo.slug.toLowerCase();
+      if (seen.has(dedupeKey)) {
+        continue;
+      }
+      seen.add(dedupeKey);
+      repos.push(repo);
+    }
+  }
+
+  return repos;
+}
+
+export function filterExcludedGitHubRepos(
+  repos: GitHubRepoRef[],
+  excludeSlugs: Iterable<string>,
+): GitHubRepoRef[] {
+  const excluded = new Set<string>();
+  for (const slug of excludeSlugs) {
+    excluded.add(slug.toLowerCase());
+  }
+  return repos.filter((repo) => !excluded.has(repo.slug.toLowerCase()));
+}
+
+type GitHubOrgRepository = {
+  name: string;
+  fork?: boolean;
+  archived?: boolean;
+  disabled?: boolean;
+};
+
+export async function listGitHubOrgRepositories(
+  org: string,
+  options: Pick<GitHubCouncilBridgeOptions, "githubApiBase" | "githubToken" | "fetchImpl"> & {
+    includeForks?: boolean;
+    includeArchived?: boolean;
+  },
+): Promise<GitHubRepoRef[]> {
+  const fetchImpl = requireFetch(options.fetchImpl);
+  const githubApiBase = options.githubApiBase ?? DEFAULT_GITHUB_API_BASE;
+  const includeForks = options.includeForks ?? false;
+  const includeArchived = options.includeArchived ?? false;
+
+  const orgRepos = await listGitHubRepositoriesForPath(
+    `/orgs/${encodeURIComponent(org)}/repos?type=all&per_page=100&page=`,
+    org,
+    { fetchImpl, githubApiBase, githubToken: options.githubToken, includeForks, includeArchived },
+  ).catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes("(404)")) {
+      throw error;
+    }
+    return null;
+  });
+
+  if (orgRepos) {
+    return orgRepos;
+  }
+
+  return listGitHubRepositoriesForPath(
+    `/users/${encodeURIComponent(org)}/repos?type=owner&per_page=100&page=`,
+    org,
+    { fetchImpl, githubApiBase, githubToken: options.githubToken, includeForks, includeArchived },
+  );
+}
+
+async function listGitHubRepositoriesForPath(
+  pathPrefix: string,
+  owner: string,
+  options: {
+    fetchImpl: FetchLike;
+    githubApiBase: string;
+    githubToken?: string;
+    includeForks: boolean;
+    includeArchived: boolean;
+  },
+): Promise<GitHubRepoRef[]> {
+  const repos: GitHubRepoRef[] = [];
+  let page = 1;
+
+  while (true) {
+    const payload = await githubGet<GitHubOrgRepository[]>(
+      `${pathPrefix}${page}&sort=updated`,
+      { githubApiBase: options.githubApiBase, githubToken: options.githubToken },
+      options.fetchImpl,
+    );
+
+    if (payload.length === 0) {
+      break;
+    }
+
+    for (const entry of payload) {
+      if (!options.includeForks && entry.fork) {
+        continue;
+      }
+      if (!options.includeArchived && entry.archived) {
+        continue;
+      }
+      if (entry.disabled) {
+        continue;
+      }
+      repos.push({ owner, repo: entry.name, slug: `${owner}/${entry.name}` });
+    }
+
+    if (payload.length < 100) {
+      break;
+    }
+    page += 1;
+  }
+
+  return repos;
+}
+
+export async function resolveGitHubCouncilRepos(options: {
+  repoList?: string;
+  orgList?: string;
+  excludeList?: string;
+  githubToken?: string;
+  githubApiBase?: string;
+  fetchImpl?: FetchLike;
+  includeForks?: boolean;
+  includeArchived?: boolean;
+}): Promise<{
+  repos: GitHubRepoRef[];
+  errors: Array<{ scope: string; message: string }>;
+}> {
+  const explicitRepos = parseGitHubRepoList(options.repoList);
+  const orgs = parseGitHubOrgList(options.orgList);
+  const excludedSlugs = parseGitHubRepoList(options.excludeList).map((repo) => repo.slug);
+  const errors: Array<{ scope: string; message: string }> = [];
+  const discoveredRepos: GitHubRepoRef[] = [];
+
+  for (const org of orgs) {
+    try {
+      const orgRepos = await listGitHubOrgRepositories(org, {
+        githubApiBase: options.githubApiBase,
+        githubToken: options.githubToken,
+        fetchImpl: options.fetchImpl,
+        includeForks: options.includeForks,
+        includeArchived: options.includeArchived,
+      });
+      discoveredRepos.push(...orgRepos);
+    } catch (error) {
+      errors.push({
+        scope: org,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const repos = filterExcludedGitHubRepos(
+    mergeGitHubRepoRefs(explicitRepos, discoveredRepos),
+    excludedSlugs,
+  );
+
+  return { repos, errors };
+}
+
 async function readJsonResponse<T>(response: Response, label: string): Promise<T> {
   const raw = await response.text();
   if (!response.ok) {
@@ -492,7 +691,9 @@ export async function runGitHubCouncilBridge(
   options: GitHubCouncilBridgeOptions
 ): Promise<GitHubCouncilBridgeResult> {
   if (options.repos.length === 0) {
-    throw new Error("At least one GitHub repo is required. Set MISSION_CONTROL_GITHUB_REPOS or pass --repo owner/repo.");
+    throw new Error(
+      "At least one GitHub repo is required. Set MISSION_CONTROL_GITHUB_REPOS, MISSION_CONTROL_GITHUB_ORG, or pass --repo owner/repo.",
+    );
   }
 
   const fetchImpl = requireFetch(options.fetchImpl);

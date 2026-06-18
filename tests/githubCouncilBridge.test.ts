@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import {
   buildPullRequestCouncilPayload,
   FetchLike,
+  parseGitHubOrgList,
   parseGitHubRepoList,
+  resolveGitHubCouncilRepos,
   runGitHubCouncilBridge
 } from "../src/hub/githubCouncilBridge";
 
@@ -124,6 +126,40 @@ test("parseGitHubRepoList accepts slugs, URLs, and dedupes", () => {
     { owner: "acme", repo: "widget", slug: "acme/widget" },
     { owner: "Other", repo: "Repo", slug: "Other/Repo" }
   ]);
+});
+
+test("parseGitHubOrgList accepts org slugs and URLs", () => {
+  const orgs = parseGitHubOrgList("acme, https://github.com/other-org, @third-org");
+  assert.deepEqual(orgs, ["acme", "other-org", "third-org"]);
+});
+
+test("resolveGitHubCouncilRepos merges explicit repos and org discovery", async () => {
+  const calls: string[] = [];
+  const fetchImpl: FetchLike = async (input) => {
+    calls.push(input);
+    if (input.includes("/orgs/acme/repos")) {
+      return jsonResponse([
+        { name: "alpha", fork: false, archived: false },
+        { name: "beta", fork: true, archived: false },
+        { name: "legacy", fork: false, archived: true }
+      ]);
+    }
+    return jsonResponse({ message: `unexpected URL ${input}` }, 404);
+  };
+
+  const { repos, errors } = await resolveGitHubCouncilRepos({
+    repoList: "acme/explicit",
+    orgList: "acme",
+    excludeList: "acme/legacy",
+    fetchImpl
+  });
+
+  assert.deepEqual(errors, []);
+  assert.deepEqual(
+    repos.map((repo) => repo.slug),
+    ["acme/explicit", "acme/alpha"]
+  );
+  assert.equal(calls.some((url) => url.includes("/orgs/acme/repos")), true);
 });
 
 test("buildPullRequestCouncilPayload flags CI failures and sensitive paths", () => {

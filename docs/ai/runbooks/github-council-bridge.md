@@ -10,13 +10,24 @@ It does not merge, publish, deploy, comment on GitHub, or change GitHub state.
 
 ## Setup
 
-Set the target repos:
+### Option A: explicit repos
 
 ```powershell
-$env:MISSION_CONTROL_GITHUB_REPOS = "owner/repo"
+$env:MISSION_CONTROL_GITHUB_REPOS = "owner/repo,owner/other-repo"
 ```
 
-For private repos, set one token. Prefer a least-privilege GitHub token with pull request and Actions read access:
+### Option B: all projects in an org (recommended)
+
+Discover every non-archived repo in a GitHub organization or user account namespace:
+
+```powershell
+$env:MISSION_CONTROL_GITHUB_ORG = "timmilkewicz-collab"
+$env:MISSION_CONTROL_GITHUB_EXCLUDE_REPOS = "timmilkewicz-collab/Meshroom"
+```
+
+You can combine both: explicit repos are merged with org discovery and deduped.
+
+For private repos, set one token. Prefer a least-privilege GitHub token with org/repo read access and pull request + Actions read:
 
 ```powershell
 $env:MISSION_CONTROL_GITHUB_TOKEN = "<github-token>"
@@ -53,6 +64,12 @@ To target a repo without env:
 
 ```powershell
 npm run github:council -- --repo owner/repo --dry-run
+```
+
+To target an entire org without env:
+
+```powershell
+npm run github:council -- --org timmilkewicz-collab --dry-run
 ```
 
 ## Live Local Council Sync
@@ -133,7 +150,7 @@ If the bridge reports no workflow runs, the PR may not have Actions runs for its
 
 If the hub returns `401`, set `MISSION_CONTROL_TOKEN` to match the running hub.
 
-If no repos are found, set `MISSION_CONTROL_GITHUB_REPOS` or pass `--repo owner/repo`.
+If no repos are found, set `MISSION_CONTROL_GITHUB_REPOS`, `MISSION_CONTROL_GITHUB_ORG`, or pass `--repo owner/repo` / `--org org-name`.
 
 ## Boundary
 
