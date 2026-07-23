@@ -6,7 +6,7 @@ export type HubDiscoveryManifest = {
   name?: string;
 };
 
-async function probeMissionControlHub(
+export async function probeMissionControlHub(
   hubUrl = resolveMissionControlHubUrl(process.env),
 ): Promise<{ live: boolean; manifest?: HubDiscoveryManifest; url: string }> {
   const candidates = loopbackHubProbeUrls(hubUrl);
