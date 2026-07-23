@@ -25,6 +25,7 @@ import {
 } from "./base44Snapshots";
 import { listOsirisConnectorSummaries, readOsirisSnapshotFile } from "./osirisSnapshots";
 import { renderDashboard } from "./html";
+import { verifyProliantSshLink } from "../application/verifyProliantSshLink";
 import { MissionControlStore } from "./store";
 
 type HubServerOptions = {
@@ -503,6 +504,11 @@ export function createHubServer(options: HubServerOptions) {
       if (method === "POST" && url.pathname === "/api/links") {
         const input = linkUpsertSchema.parse(await readJsonBody(request));
         return sendJson(response, 201, options.store.upsertLink(input));
+      }
+
+      if (method === "POST" && url.pathname === "/api/fleet/verify-proliant-ssh") {
+        const result = verifyProliantSshLink(options.store);
+        return sendJson(response, 200, result);
       }
 
       if (method === "POST" && url.pathname === "/api/task-requests") {

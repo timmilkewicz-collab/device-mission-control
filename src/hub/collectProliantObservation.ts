@@ -13,7 +13,7 @@ async function main(): Promise<void> {
 
   const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 
-const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? "192.168.0.174";
+const host = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_HOST ?? process.env.MISSION_CONTROL_PROLIANT_SSH_HOST ?? CANONICAL_LINUX_NODE_ID;
 const user = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_USER ?? process.env.MISSION_CONTROL_PROLIANT_SSH_USER ?? "macro";
 const password = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PASSWORD ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PASSWORD;
 const port = process.env.MISSION_CONTROL_REMOTE_LINUX_SSH_PORT ?? process.env.MISSION_CONTROL_PROLIANT_SSH_PORT ?? "22";
