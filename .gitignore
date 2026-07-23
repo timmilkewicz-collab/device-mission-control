@@ -2,6 +2,7 @@ node_modules
 dist
 .mission-control
 .local-artifacts
+.cursor
 *.log
 .env
 .env.local

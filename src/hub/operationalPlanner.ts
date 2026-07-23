@@ -1,4 +1,7 @@
-import { DesktopControlEvaluation, DeviceRecord, HubState, NodeRecord, Observation, PlanSnapshot, nowIso } from "../shared/types";
+import { DeviceRecord, HubState, NodeRecord, Observation, PlanSnapshot, nowIso } from "../shared/types";
+import { evaluateDesktopControlReadiness } from "../domain/tasks/desktopControlReadinessPolicy";
+
+export { evaluateDesktopControlReadiness };
 
 function getLatestObservation(state: HubState, deviceId: string): Observation | undefined {
   return [...state.observations].reverse().find((entry) => entry.deviceId === deviceId);
@@ -6,39 +9,6 @@ function getLatestObservation(state: HubState, deviceId: string): Observation | 
 
 function ageMinutes(iso: string): number {
   return Math.round((Date.now() - Date.parse(iso)) / 60000);
-}
-
-export function evaluateDesktopControlReadiness(state: HubState): DesktopControlEvaluation {
-  const reasons: string[] = [];
-  const deviceCount = Object.keys(state.devices).length;
-  const observationCount = state.observations.length;
-  const completedTasks = state.taskRequests.filter((task) => task.status === "completed").length;
-  const failedTasks = state.taskRequests.filter((task) => task.status === "failed").length;
-  const riskyDevices = Object.values(state.devices).filter(
-    (device) => device.permissions.desktopControl || device.permissions.shell
-  );
-
-  if (deviceCount < 2) {
-    reasons.push("Need at least two connected devices before evaluating desktop pilot value.");
-  }
-  if (observationCount < 5) {
-    reasons.push("Need more observation history to understand normal behavior across devices.");
-  }
-  if (completedTasks < 3) {
-    reasons.push("Approval-gated task execution has not been exercised enough to justify direct control.");
-  }
-  if (failedTasks > completedTasks) {
-    reasons.push("Task failures are still too common; keep desktop control disabled until automation is steadier.");
-  }
-  if (riskyDevices.length > 0) {
-    reasons.push("Desktop control remains off-by-default because one or more devices already allow elevated actions.");
-  }
-
-  return {
-    recommendation: reasons.length === 0 ? "pilot_ready" : "not_ready",
-    reasons,
-    checkedAt: nowIso()
-  };
 }
 
 function summarizeDevice(device: DeviceRecord, observation: Observation | undefined): string {

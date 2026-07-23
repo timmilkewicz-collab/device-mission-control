@@ -3,12 +3,14 @@ import path from "node:path";
 import { resolveCanonicalRoot } from "../shared/canonical";
 import { loopbackHubProbeUrls, resolveMissionControlHubUrl } from "../shared/env";
 import {
+  linkEvidencePackagesToIntegrityAlerts,
   listBase44AppsFromSnapshots,
   listBase44EvidencePackages,
   listBase44IntegrityAlerts
 } from "./base44Snapshots";
 import { listOsirisConnectorSummaries } from "./osirisSnapshots";
 import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "./operationalPlanner";
+import { IntegrityReviewStore } from "./integrityReviewStore";
 import { resolveDataPath, resolveMissionControlDataDir } from "../shared/paths";
 import { HubState, hubStateSchema } from "../shared/types";
 
@@ -194,7 +196,17 @@ export function buildCanonicalStatusSnapshot(
   const plan = buildPlanSnapshot(state);
   const desktopControl = evaluateDesktopControlReadiness(state);
   const base44Apps = listBase44AppsFromSnapshots(dataDir);
-  const integrityAlerts = listBase44IntegrityAlerts(base44Apps);
+  const integrityReviewStore = new IntegrityReviewStore(path.join(dataDir, "base44-integrity-reviews.json"));
+  const integrityAlerts = linkEvidencePackagesToIntegrityAlerts(
+    listBase44IntegrityAlerts(base44Apps),
+    listBase44EvidencePackages(base44Apps)
+  ).map((alert) => {
+    if (!alert.id) {
+      return alert;
+    }
+    const review = integrityReviewStore.get(alert.appId, alert.id);
+    return review ? { ...alert, acknowledgedAt: review.acknowledgedAt, acknowledgedBy: review.actor } : alert;
+  });
   const evidencePackages = listBase44EvidencePackages(base44Apps);
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   const openCouncilSessions = state.councilSessions.filter((session) => session.status === "open");

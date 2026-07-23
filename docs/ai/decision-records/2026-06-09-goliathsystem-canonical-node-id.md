@@ -34,4 +34,4 @@ Hardware role is still not human-confirmed as ProLiant. SSH may remain blocked u
 
 ## Status
 
-Implemented
+Implemented. Operator confirmed on 2026-06-09 (recorded in hub node notes for `goliathsystem`). SSH verification still blocked until key/password auth succeeds over a reachable path.

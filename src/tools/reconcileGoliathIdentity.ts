@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   loadMissionControlEnv();
   await assertHubNotRunningForDiskWrites();
 
-  const reconciled = applyGoliathIdentityReconciliation();
+  const reconciled = applyGoliathIdentityReconciliation(resolveDataPath("hub-state.json"));
   const store = new MissionControlStore(resolveDataPath("hub-state.json"));
 
   console.log(
