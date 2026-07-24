@@ -13,6 +13,11 @@ import { buildPlanSnapshot, evaluateDesktopControlReadiness } from "./operationa
 import { IntegrityReviewStore } from "./integrityReviewStore";
 import { resolveDataPath, resolveMissionControlDataDir } from "../shared/paths";
 import { HubState, hubStateSchema } from "../shared/types";
+import type { PolicyAdoptionSummary } from "../shared/policyAdoptionObservation";
+import {
+  loadPolicyAdoptionObservation,
+  summarizePolicyAdoption
+} from "../infrastructure/council/policyAdoptionLoader";
 
 export type CanonicalStatusExportOptions = {
   cwd?: string;
@@ -24,6 +29,8 @@ export type CanonicalStatusExportOptions = {
   tokenPresent?: boolean;
   host?: string;
   refreshNetwork?: boolean;
+  /** Read-only path to sanitized Council policy adoption observation JSON */
+  policyAdoptionPath?: string;
 };
 
 export type HubReachability = {
@@ -109,6 +116,11 @@ export type CanonicalStatusSnapshot = {
     acknowledgedAt?: string;
   }>;
   refreshRitual: string[];
+  /**
+   * Read-only Council pack adoption status.
+   * Mission Control must not write/merge context packs.
+   */
+  policyAdoption: PolicyAdoptionSummary;
 };
 
 export type CanonicalStatusWriteResult = {
@@ -210,6 +222,12 @@ export function buildCanonicalStatusSnapshot(
   const evidencePackages = listBase44EvidencePackages(base44Apps);
   const pendingApprovals = state.taskRequests.filter((task) => task.status === "pending");
   const openCouncilSessions = state.councilSessions.filter((session) => session.status === "open");
+  const policyAdoption = summarizePolicyAdoption(
+    loadPolicyAdoptionObservation({
+      filePath: options.policyAdoptionPath,
+      env: process.env
+    })
+  );
 
   return {
     generatedAtUtc: new Date().toISOString(),
@@ -240,6 +258,7 @@ export function buildCanonicalStatusSnapshot(
     },
     plan,
     desktopControl,
+    policyAdoption,
     nodes: Object.values(state.nodes)
       .sort((left, right) => left.label.localeCompare(right.label))
       .map((node) => ({
@@ -409,6 +428,27 @@ export function renderCanonicalStatusMarkdown(snapshot: CanonicalStatusSnapshot)
   lines.push("");
   for (const [key, value] of Object.entries(snapshot.counts)) {
     lines.push(`- **${key}:** ${value}`);
+  }
+  lines.push("");
+  lines.push("## Policy adoption (read-only)");
+  lines.push("");
+  lines.push("_Council Context Pack Federation observation. Mission Control has no pack write/merge authority._");
+  lines.push("");
+  if (!snapshot.policyAdoption.observedAtUtc) {
+    lines.push("_No adoption observation loaded._");
+  } else {
+    lines.push(`- **Observed (UTC):** ${snapshot.policyAdoption.observedAtUtc}`);
+    if (snapshot.policyAdoption.producer) {
+      lines.push(`- **Producer:** ${snapshot.policyAdoption.producer}`);
+    }
+    for (const [status, count] of Object.entries(snapshot.policyAdoption.counts)) {
+      lines.push(`- **${status}:** ${count}`);
+    }
+    for (const item of snapshot.policyAdoption.observations.slice(0, 12)) {
+      lines.push(
+        `- \`${item.contextId}\` ${item.packId}@${item.packVersion} → **${item.adoptionStatus}**`
+      );
+    }
   }
   lines.push("");
   lines.push("## Operational truth");
