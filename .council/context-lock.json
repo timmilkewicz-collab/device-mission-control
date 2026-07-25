@@ -1,0 +1,8 @@
+{
+  "schema": "council.context-lock.v1",
+  "contextId": "mission-control",
+  "packId": "mission-control.agent-context-pack",
+  "packVersion": "1.0.0",
+  "contentSha256": "53a4ab2b7d4d5c8bb79c3c34ad8abefcf6e17be25d343284cc06fe6a01e4656d",
+  "lockedAtUtc": "2026-07-23T00:00:00.000Z"
+}
